@@ -73,3 +73,20 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# Android build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+
+# iOS build output (keep Pods/ excluded, but commit Podfile.lock and xcworkspace)
+ios/build/

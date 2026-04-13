@@ -1,97 +1,158 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Mythiko Chorio — Μυθικό Χωριό
 
-# Getting Started
+[![Licence: AGPL v3](https://img.shields.io/badge/Licence-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+A Greek language learning app for children, built with React Native.
 
-## Step 1: Start Metro
+Children explore a mythical Greek village, earning stars and souvenirs as they learn the alphabet, vocabulary, and songs through games and interactive activities. The app supports both school accounts (Microsoft SSO) and anonymous guest play.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+---
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Tech Stack
 
-```sh
-# Using npm
-npm start
+| Layer             | Technology                      |
+| ----------------- | ------------------------------- |
+| Mobile            | React Native 0.85 + TypeScript  |
+| Navigation        | React Navigation (native stack) |
+| Backend / Auth    | Supabase (dedicated project)    |
+| Animations        | Lottie, Reanimated              |
+| Drawing / Tracing | Shopify React Native Skia       |
+| State             | Zustand                         |
+| CI                | GitHub Actions                  |
 
-# OR using Yarn
-yarn start
+---
+
+## Prerequisites
+
+- Node.js ≥ 22
+- Xcode (iOS) / Android Studio (Android)
+- Ruby via rbenv (for CocoaPods)
+- A Supabase project (see [Database setup](#database-setup))
+
+Full environment setup guide: [React Native Environment Setup](https://reactnative.dev/docs/set-up-your-environment)
+
+---
+
+## Getting Started
+
+### 1. Install dependencies
+
+```bash
+npm install
 ```
 
-## Step 2: Build and run your app
+### 2. Configure environment
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```bash
+cp .env.example .env
 ```
 
-### iOS
+Edit `.env` with your Supabase credentials:
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Then, and every time you update your native dependencies, run:
+### 3. iOS setup
 
-```sh
-bundle exec pod install
+```bash
+cd ios && LANG=en_US.UTF-8 bundle exec pod install && cd ..
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+> `LANG=en_US.UTF-8` is required — CocoaPods crashes without it on some macOS setups.
+> Add `export LANG=en_US.UTF-8` to `~/.zshrc` to make it permanent.
 
-```sh
-# Using npm
-npm run ios
+### 4. Android setup
 
-# OR using Yarn
-yarn ios
+Create `android/local.properties` (gitignored):
+
+```
+sdk.dir=/Users/<you>/Library/Android/sdk
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### 5. Run
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```bash
+# iOS simulator
+npx react-native run-ios
 
-## Step 3: Modify your app
+# Android emulator (start AVD first)
+npx react-native run-android
 
-Now that you have successfully run the app, let's make changes!
+# Metro bundler (separate terminal)
+npx react-native start
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+---
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Database Setup
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+This app uses its own dedicated Supabase project — it does not share a database with any other system.
 
-## Congratulations! :tada:
+1. Create a new Supabase project
+2. Open the SQL editor and run `supabase/schema.sql` — this creates all tables, RLS policies, and functions from scratch
+3. Optionally run `supabase/seed.sql` for development test data
+4. Add the project URL and anon key to your `.env`
 
-You've successfully run and modified your React Native App. :partying_face:
+See [CLAUDE.md](CLAUDE.md) for full database documentation.
 
-### Now what?
+---
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+## Project Structure
 
-# Troubleshooting
+```
+src/
+├── app/            # Navigation root and theme (colors, typography, spacing)
+├── features/       # One folder per product feature
+│   ├── auth/       # Welcome screen, sign-in flow
+│   ├── map/        # Island map home screen
+│   ├── games/      # Game modules (phase 1+)
+│   ├── letterLab/  # Letter tracing (phase 1+)
+│   ├── jukebox/    # Music player (phase 1+)
+│   ├── rewards/    # Backpack and streaks (phase 1+)
+│   └── dashboard/  # Teacher and admin views (phase 1+)
+└── shared/
+    ├── models/     # TypeScript types
+    ├── services/   # Supabase wrappers
+    ├── components/ # Shared UI (phase 1+)
+    └── hooks/      # Shared hooks (phase 1+)
+supabase/
+├── schema.sql      # Complete database schema — source of truth
+└── seed.sql        # Development seed data
+```
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+---
 
-# Learn More
+## Development
 
-To learn more about React Native, take a look at the following resources:
+```bash
+# Type check
+npx tsc --noEmit
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+# Lint
+npx eslint "src/**/*.{ts,tsx}"
+
+# Tests
+npm test
+```
+
+CI runs all three on every push via GitHub Actions (`.github/workflows/ci.yml`).
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Security
+
+If you discover a security vulnerability, please follow the process in [SECURITY.md](SECURITY.md) rather than opening a public issue.
+
+---
+
+## Licence
+
+See [LICENSE](LICENSE).
