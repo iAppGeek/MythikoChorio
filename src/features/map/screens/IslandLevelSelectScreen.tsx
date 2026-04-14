@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: spacing.md,
     gap: spacing.md,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   cardBoss: {
     borderWidth: 2,
     borderColor: colors.sunshineYellow,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: colors.bossCardBg,
   },
   cardLocked: {
     opacity: 0.55,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.sunshineYellow,
   },
   badgeLocked: {
-    backgroundColor: '#C0C8D0',
+    backgroundColor: colors.lockedBadge,
   },
   badgeText: {
     fontSize: typography.fontSize.body,
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     color: colors.oliveGreen,
   },
   textLocked: {
-    color: '#8A9BAB',
+    color: colors.muted,
   },
 
   // ── Right side

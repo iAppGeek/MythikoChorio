@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { Canvas, Path } from '@shopify/react-native-skia';
 import type { GreekLetter, Point, Stroke } from '../../../data/alphabet/letterData';
 import { CANVAS_SIZE } from '../../../data/alphabet/letterData';
+import { buildPathFromStrokes, buildAnimatedPath } from '../../../shared/utils/skiaPathBuilder';
 import { colors } from '../../../app/theme/colors';
-import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
+import { gameStyles } from '../../../app/theme/gameStyles';
 
 const POINTS_PER_FRAME = 2;
 const FRAME_MS = 80;
@@ -25,29 +26,6 @@ function interpolateStroke(stroke: Stroke, density = 8): Stroke {
     }
   }
   return result;
-}
-
-/** Build a Skia path from the first `count` points across all strokes. */
-function buildAnimatedPath(
-  strokes: Stroke[],
-  count: number,
-): ReturnType<typeof Skia.Path.Make> {
-  const skPath = Skia.Path.Make();
-  let remaining = count;
-
-  for (const stroke of strokes) {
-    if (remaining <= 0) break;
-    const take = Math.min(remaining, stroke.length);
-    if (take > 0) {
-      skPath.moveTo(stroke[0].x, stroke[0].y);
-      for (let i = 1; i < take; i++) {
-        skPath.lineTo(stroke[i].x, stroke[i].y);
-      }
-    }
-    remaining -= stroke.length;
-  }
-
-  return skPath;
 }
 
 type Props = {
@@ -115,30 +93,19 @@ export function WatchItWriteStep({ letter, onComplete }: Props): React.JSX.Eleme
     [animStrokes, revealed],
   );
 
-  // Ghost path (full letter, light gray)
-  const ghostPath = useMemo(() => {
-    const p = Skia.Path.Make();
-    for (const stroke of letter.strokes) {
-      if (stroke.length === 0) continue;
-      p.moveTo(stroke[0].x, stroke[0].y);
-      for (let i = 1; i < stroke.length; i++) {
-        p.lineTo(stroke[i].x, stroke[i].y);
-      }
-    }
-    return p;
-  }, [letter]);
+  const ghostPath = useMemo(() => buildPathFromStrokes(letter.strokes), [letter]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.stepLabel}>Watch It Write</Text>
+    <View style={gameStyles.stepBody}>
+      <Text style={gameStyles.stepLabel}>Watch It Write</Text>
       <Text style={styles.char}>{letter.char}</Text>
 
-      <View style={styles.canvasWrapper}>
+      <View style={gameStyles.canvasWrapper}>
         <Canvas style={styles.canvas}>
           {/* Ghost template */}
           <Path
             path={ghostPath}
-            color="#E2E8F0"
+            color={colors.border}
             style="stroke"
             strokeWidth={18}
             strokeCap="round"
@@ -164,34 +131,10 @@ export function WatchItWriteStep({ letter, onComplete }: Props): React.JSX.Eleme
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.screen,
-    gap: spacing.lg,
-  },
-  stepLabel: {
-    fontSize: typography.fontSize.caption,
-    color: colors.oliveGreen,
-    fontWeight: typography.fontWeight.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
   char: {
     fontSize: typography.fontSize.heading,
     fontWeight: typography.fontWeight.bold,
     color: colors.oceanBlue,
-  },
-  canvasWrapper: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.cloudWhite,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   canvas: {
     width: CANVAS_SIZE,

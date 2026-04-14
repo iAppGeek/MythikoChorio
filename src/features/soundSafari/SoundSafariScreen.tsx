@@ -10,44 +10,33 @@ import {
   View,
   Text,
   Pressable,
-  Alert,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
 import { GREEK_LETTERS } from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
-import { upsertLevelProgress } from '../../shared/services/progressService';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
 import {
   saveGameProgress,
   loadGameProgress,
-  clearGameProgress,
 } from '../../shared/services/gameProgressCache';
+import { buildShuffledOptions } from '../../shared/utils/quizHelpers';
+import { finishGame } from '../../shared/utils/finishGame';
+import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
 import { useAuthStore } from '../../shared/stores/authStore';
 import { colors } from '../../app/theme/colors';
 import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
+import { gameStyles } from '../../app/theme/gameStyles';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'SoundSafari'>;
 
 type AnswerState = 'pending' | 'correct' | 'wrong';
-
-function pickDistractors(correct: GreekLetter): GreekLetter[] {
-  const pool = GREEK_LETTERS.filter(l => l.id !== correct.id);
-  return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
-}
-
-function buildOptions(correct: GreekLetter): GreekLetter[] {
-  const distractors = pickDistractors(correct);
-  const insertAt = Math.floor(Math.random() * 4);
-  const opts = [...distractors];
-  opts.splice(insertAt, 0, correct);
-  return opts;
-}
 
 function correctionsToStars(correct: number, total: number): 1 | 2 | 3 {
   const pct = (correct / total) * 100;
@@ -62,9 +51,9 @@ export function SoundSafariScreen({
 }: Props): React.JSX.Element {
   const { islandId, levelId } = route.params;
   const levelName =
-    getLevelsForIsland(islandId as IslandId).find(l => l.id === levelId)
+    getLevelsForIsland(islandId as IslandId).find((l) => l.id === levelId)
       ?.name ?? levelId;
-  const studentProfile = useAuthStore(s => s.studentProfile);
+  const studentProfile = useAuthStore((s) => s.studentProfile);
   const profileId = studentProfile?.id ?? 'guest';
 
   const [roundIndex, setRoundIndex] = useState(0);
@@ -76,12 +65,15 @@ export function SoundSafariScreen({
 
   const total = GREEK_LETTERS.length;
   const letter = GREEK_LETTERS[roundIndex];
-  const options = useMemo(() => buildOptions(letter), [letter]);
+  const options = useMemo(
+    () => buildShuffledOptions(GREEK_LETTERS, letter, 3),
+    [letter],
+  );
 
   // Restore saved progress on mount
   useEffect(() => {
     loadGameProgress('soundSafari', levelId, profileId)
-      .then(saved => {
+      .then((saved) => {
         if (saved) {
           setRoundIndex(saved.roundIndex);
           setCorrect(saved.correct);
@@ -90,58 +82,33 @@ export function SoundSafariScreen({
       .finally(() => setLoading(false));
   }, [levelId, profileId]);
 
-  const handleExit = useCallback((): void => {
-    Alert.alert(
-      'Save & Exit',
-      'Your progress has been saved. Continue later?',
-      [
-        { text: 'Keep Playing', style: 'cancel' },
-        {
-          text: 'Exit',
-          style: 'destructive',
-          onPress: (): void => {
-            saveGameProgress('soundSafari', levelId, profileId, {
-              roundIndex,
-              correct,
-            }).catch(() => {});
-            navigation.goBack();
-          },
-        },
-      ],
-    );
-  }, [roundIndex, correct, levelId, profileId, navigation]);
+  const handleSave = useCallback((): void => {
+    saveGameProgress('soundSafari', levelId, profileId, {
+      roundIndex,
+      correct,
+    }).catch(() => {});
+  }, [roundIndex, correct, levelId, profileId]);
 
-  const finishGame = useCallback(
+  const handleExit = useExitConfirmation(navigation, handleSave);
+
+  const handleFinishGame = useCallback(
     async (finalCorrect: number): Promise<void> => {
-      setSaving(true);
-      await clearGameProgress('soundSafari', levelId, profileId);
       const stars = correctionsToStars(finalCorrect, total);
       const score = Math.round((finalCorrect / total) * 100);
-      if (studentProfile) {
-        try {
-          await upsertLevelProgress({
-            studentProfileId: studentProfile.id,
-            islandId,
-            levelId,
-            starsEarned: stars,
-            bestScore: score,
-          });
-        } catch {
-          // Non-fatal
-        }
-      }
-      setSaving(false);
-      navigation.replace('Results', { stars, levelName, islandId, levelId });
+      await finishGame({
+        game: 'soundSafari',
+        levelId,
+        profileId,
+        studentProfileId: studentProfile?.id,
+        islandId,
+        stars,
+        bestScore: score,
+        setSaving,
+        onComplete: () =>
+          navigation.replace('Results', { stars, levelName, islandId, levelId }),
+      });
     },
-    [
-      studentProfile,
-      islandId,
-      levelId,
-      levelName,
-      profileId,
-      total,
-      navigation,
-    ],
+    [studentProfile, islandId, levelId, levelName, profileId, total, navigation],
   );
 
   function handleChoice(chosen: GreekLetter): void {
@@ -155,7 +122,7 @@ export function SoundSafariScreen({
     setTimeout(() => {
       const next = roundIndex + 1;
       if (next >= total) {
-        finishGame(newCorrect).catch(() => {});
+        handleFinishGame(newCorrect).catch(() => {});
       } else {
         setRoundIndex(next);
         setAnswerState('pending');
@@ -164,52 +131,52 @@ export function SoundSafariScreen({
     }, 1000);
   }
 
-  function optionStyle(opt: GreekLetter): object {
+  function optionStyle(opt: GreekLetter): StyleProp<ViewStyle> {
     if (chosenId === opt.id) {
       return answerState === 'correct'
-        ? styles.optionCorrect
-        : styles.optionWrong;
+        ? [gameStyles.option, gameStyles.optionCorrect]
+        : [gameStyles.option, gameStyles.optionWrong];
     }
     if (answerState !== 'pending' && opt.id === letter.id) {
-      return styles.optionCorrect;
+      return [gameStyles.option, gameStyles.optionCorrect];
     }
-    return styles.option;
+    return gameStyles.option;
   }
 
   if (loading || saving) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={gameStyles.container}>
         <ActivityIndicator
           size="large"
           color={colors.oceanBlue}
-          style={styles.loader}
+          style={gameStyles.loader}
         />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
+    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
+      <View style={gameStyles.header}>
+        <View style={gameStyles.headerRow}>
           <Pressable
-            style={styles.exitBtn}
+            style={gameStyles.exitBtn}
             onPress={handleExit}
             accessibilityRole="button"
             accessibilityLabel="Save and exit"
           >
-            <Text style={styles.exitText}>✕</Text>
+            <Text style={gameStyles.exitText}>✕</Text>
           </Pressable>
-          <Text style={styles.title}>Sound Safari 🔊</Text>
-          <View style={styles.exitBtn} />
+          <Text style={gameStyles.title}>Sound Safari 🔊</Text>
+          <View style={gameStyles.exitBtn} />
         </View>
         <Text style={styles.score}>
           {correct} / {roundIndex} correct
         </Text>
-        <View style={styles.progressTrack}>
+        <View style={[gameStyles.progressTrack, styles.progressTrackMargin]}>
           <View
             style={[
-              styles.progressFill,
+              gameStyles.progressFill,
               { width: `${((roundIndex + 1) / total) * 100}%` },
             ]}
           />
@@ -218,19 +185,19 @@ export function SoundSafariScreen({
 
       <View style={styles.body}>
         <Text style={styles.prompt}>What sound does this letter make?</Text>
-        <View style={styles.charCard}>
+        <View style={[gameStyles.charCard, styles.charCardSize]}>
           <Text style={styles.char}>{letter.char}</Text>
           <Text style={styles.charName}>{letter.greekName}</Text>
         </View>
 
         <View style={styles.grid}>
-          {options.map(opt => (
+          {options.map((opt) => (
             <Pressable
               key={opt.id}
               style={({ pressed }) => [
-                styles.option,
+                gameStyles.option,
                 optionStyle(opt),
-                pressed && answerState === 'pending' && styles.optionPressed,
+                pressed && answerState === 'pending' && gameStyles.optionPressed,
               ]}
               onPress={() => handleChoice(opt)}
               disabled={answerState !== 'pending'}
@@ -244,7 +211,7 @@ export function SoundSafariScreen({
         </View>
 
         {answerState !== 'pending' && (
-          <Text style={styles.feedback}>
+          <Text style={gameStyles.feedback}>
             {answerState === 'correct' ? '🎉 Correct!' : `✗ "${letter.sound}"`}
           </Text>
         )}
@@ -254,53 +221,13 @@ export function SoundSafariScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.softSand },
-  loader: { flex: 1 },
-
-  header: {
-    paddingHorizontal: spacing.screen,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  exitBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exitText: {
-    fontSize: 18,
-    color: '#8A9BAB',
-    fontWeight: typography.fontWeight.medium,
-  },
-  title: {
-    fontSize: typography.fontSize.subheading,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.oceanBlue,
-    textAlign: 'center',
-  },
   score: {
     fontSize: typography.fontSize.caption,
     color: colors.oliveGreen,
     textAlign: 'center',
   },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    overflow: 'hidden',
+  progressTrackMargin: {
     marginTop: spacing.xs,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.sunshineYellow,
-    borderRadius: 3,
   },
 
   body: {
@@ -316,19 +243,10 @@ const styles = StyleSheet.create({
     color: colors.oceanBlue,
     textAlign: 'center',
   },
-  charCard: {
-    backgroundColor: colors.cloudWhite,
-    borderRadius: 20,
+  charCardSize: {
     width: 160,
     height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.xs,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   char: {
     fontSize: 96,
@@ -348,52 +266,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
-  option: {
-    backgroundColor: colors.cloudWhite,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    width: '47%',
-    alignItems: 'center',
-    gap: 4,
-  },
-  optionPressed: { opacity: 0.75 },
-  optionCorrect: {
-    backgroundColor: '#D1FAE5',
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#10B981',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    width: '47%',
-    alignItems: 'center',
-    gap: 4,
-  },
-  optionWrong: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#EF4444',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    width: '47%',
-    alignItems: 'center',
-    gap: 4,
-  },
   optionText: {
     fontSize: typography.fontSize.caption,
-    color: '#1E293B',
+    color: colors.textDark,
     textAlign: 'center',
   },
   optionLetter: {
-    fontSize: typography.fontSize.subheading,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.oceanBlue,
-  },
-
-  feedback: {
     fontSize: typography.fontSize.subheading,
     fontWeight: typography.fontWeight.bold,
     color: colors.oceanBlue,

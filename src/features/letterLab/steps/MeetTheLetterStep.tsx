@@ -4,6 +4,7 @@ import type { GreekLetter } from '../../../data/alphabet/letterData';
 import { colors } from '../../../app/theme/colors';
 import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
+import { gameStyles } from '../../../app/theme/gameStyles';
 
 type Props = {
   letter: GreekLetter;
@@ -13,7 +14,7 @@ type Props = {
 export function MeetTheLetterStep({ letter, onComplete }: Props): React.JSX.Element {
   return (
     <View style={styles.container}>
-      <Text style={styles.stepLabel}>Meet the Letter</Text>
+      <Text style={gameStyles.stepLabel}>Meet the Letter</Text>
 
       <View style={styles.card}>
         <Text style={styles.char}>{letter.char}</Text>
@@ -25,11 +26,11 @@ export function MeetTheLetterStep({ letter, onComplete }: Props): React.JSX.Elem
       </View>
 
       <Pressable
-        style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
+        style={({ pressed }) => [gameStyles.btn, styles.btnWide, pressed && gameStyles.btnPressed]}
         onPress={onComplete}
         accessibilityRole="button"
         accessibilityLabel="Continue to next step">
-        <Text style={styles.btnText}>Next →</Text>
+        <Text style={gameStyles.btnText}>Next →</Text>
       </Pressable>
     </View>
   );
@@ -43,13 +44,6 @@ const styles = StyleSheet.create({
     padding: spacing.screen,
     gap: spacing.xl,
   },
-  stepLabel: {
-    fontSize: typography.fontSize.caption,
-    color: colors.oliveGreen,
-    fontWeight: typography.fontWeight.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
   card: {
     backgroundColor: colors.cloudWhite,
     borderRadius: 20,
@@ -57,7 +51,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     gap: spacing.sm,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -87,7 +81,7 @@ const styles = StyleSheet.create({
   },
   soundLabel: {
     fontSize: typography.fontSize.caption,
-    color: '#8A9BAB',
+    color: colors.muted,
     fontWeight: typography.fontWeight.medium,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -97,20 +91,7 @@ const styles = StyleSheet.create({
     color: colors.oliveGreen,
     textAlign: 'center',
   },
-  btn: {
-    backgroundColor: colors.oceanBlue,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 14,
+  btnWide: {
     minWidth: 160,
-    alignItems: 'center',
-  },
-  btnPressed: {
-    opacity: 0.75,
-  },
-  btnText: {
-    color: colors.cloudWhite,
-    fontSize: typography.fontSize.body,
-    fontWeight: typography.fontWeight.bold,
   },
 });

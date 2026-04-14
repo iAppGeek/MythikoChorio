@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -80,7 +80,7 @@ export function WelcomeScreen(): React.JSX.Element {
 
           {formState === 'idle' && (
             <View style={styles.buttonGroup}>
-              <TouchableOpacity
+              <Pressable
                 style={[styles.button, styles.primaryButton]}
                 onPress={handlePlayAsGuestPress}
                 accessibilityRole="button"
@@ -88,7 +88,7 @@ export function WelcomeScreen(): React.JSX.Element {
                 <Text style={[styles.buttonText, styles.primaryButtonText]}>
                   Play as Guest
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           )}
 
@@ -126,7 +126,7 @@ export function WelcomeScreen(): React.JSX.Element {
                 <Text style={styles.errorText}>{errorMessage}</Text>
               )}
 
-              <TouchableOpacity
+              <Pressable
                 style={[styles.button, styles.primaryButton, styles.formSubmit]}
                 onPress={handleStartPlaying}
                 accessibilityRole="button"
@@ -134,15 +134,15 @@ export function WelcomeScreen(): React.JSX.Element {
                 <Text style={[styles.buttonText, styles.primaryButtonText]}>
                   Start Playing!
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
 
-              <TouchableOpacity
+              <Pressable
                 style={styles.backLink}
                 onPress={handleBack}
                 accessibilityRole="button"
                 accessibilityLabel="Go back">
                 <Text style={styles.backLinkText}>← Back</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           )}
 

@@ -12,6 +12,7 @@ import type { PlayerStackParamList } from '../../../app/navigationTypes';
 import { colors } from '../../../app/theme/colors';
 import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
+import { gameStyles } from '../../../app/theme/gameStyles';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'Results'>;
 
@@ -44,19 +45,17 @@ export function ResultsScreen({ route, navigation }: Props): React.JSX.Element {
   const praise = PRAISE[stars - 1];
 
   function handleReplay(): void {
-    // Pop Results, then the game screen navigates fresh — go back twice
     navigation.pop(2);
   }
 
   function handleContinue(): void {
-    // Go back to IslandLevelSelect, which will re-fetch progress on focus
     navigation.navigate('IslandLevelSelect', { islandId });
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
       <View style={styles.body}>
-        <Text style={styles.levelName}>{levelName}</Text>
+        <Text style={gameStyles.stepLabel}>{levelName}</Text>
 
         <View style={styles.starRow}>
           {[1, 2, 3].map((n, i) => (
@@ -78,18 +77,18 @@ export function ResultsScreen({ route, navigation }: Props): React.JSX.Element {
 
         <View style={styles.buttons}>
           <Pressable
-            style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressed]}
+            style={({ pressed }) => [gameStyles.btnSecondary, pressed && gameStyles.btnPressed]}
             onPress={handleReplay}
             accessibilityRole="button"
             accessibilityLabel={`Replay ${levelName}`}>
-            <Text style={styles.btnSecondaryText}>↩ Replay</Text>
+            <Text style={gameStyles.btnSecondaryText}>↩ Replay</Text>
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+            style={({ pressed }) => [gameStyles.btn, pressed && gameStyles.btnPressed]}
             onPress={handleContinue}
             accessibilityRole="button"
             accessibilityLabel="Continue to island">
-            <Text style={styles.btnText}>Continue →</Text>
+            <Text style={gameStyles.btnText}>Continue →</Text>
           </Pressable>
         </View>
       </View>
@@ -98,23 +97,12 @@ export function ResultsScreen({ route, navigation }: Props): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.softSand,
-  },
   body: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.screen,
     gap: spacing.lg,
-  },
-  levelName: {
-    fontSize: typography.fontSize.caption,
-    color: colors.oliveGreen,
-    fontWeight: typography.fontWeight.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   starRow: {
     flexDirection: 'row',
@@ -142,33 +130,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     marginTop: spacing.sm,
-  },
-  btn: {
-    backgroundColor: colors.oceanBlue,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  btnText: {
-    color: colors.cloudWhite,
-    fontSize: typography.fontSize.body,
-    fontWeight: typography.fontWeight.bold,
-  },
-  btnSecondary: {
-    borderWidth: 2,
-    borderColor: colors.oceanBlue,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  btnSecondaryText: {
-    color: colors.oceanBlue,
-    fontSize: typography.fontSize.body,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  pressed: {
-    opacity: 0.75,
   },
 });

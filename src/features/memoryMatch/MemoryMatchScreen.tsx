@@ -24,18 +24,19 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
 import { GREEK_LETTERS } from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
-import { upsertLevelProgress } from '../../shared/services/progressService';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
 import {
   saveGameProgress,
   loadGameProgress,
-  clearGameProgress,
 } from '../../shared/services/gameProgressCache';
+import { finishGame } from '../../shared/utils/finishGame';
+import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
 import { useAuthStore } from '../../shared/stores/authStore';
 import { colors } from '../../app/theme/colors';
 import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
+import { gameStyles } from '../../app/theme/gameStyles';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'MemoryMatch'>;
 
@@ -71,7 +72,7 @@ function buildDeckFromIds(deckIds: string[]): Card[] {
     });
   }
   return deckIds
-    .map(id => byId.get(id))
+    .map((id) => byId.get(id))
     .filter((c): c is Card => c !== undefined);
 }
 
@@ -91,7 +92,7 @@ function newShuffledDeckIds(letters: GreekLetter[]): string[] {
       sublabel: l.name,
     });
   }
-  return cards.sort(() => Math.random() - 0.5).map(c => c.id);
+  return cards.sort(() => Math.random() - 0.5).map((c) => c.id);
 }
 
 export function MemoryMatchScreen({
@@ -100,9 +101,9 @@ export function MemoryMatchScreen({
 }: Props): React.JSX.Element {
   const { islandId, levelId } = route.params;
   const levelName =
-    getLevelsForIsland(islandId as IslandId).find(l => l.id === levelId)
+    getLevelsForIsland(islandId as IslandId).find((l) => l.id === levelId)
       ?.name ?? levelId;
-  const studentProfile = useAuthStore(s => s.studentProfile);
+  const studentProfile = useAuthStore((s) => s.studentProfile);
   const profileId = studentProfile?.id ?? 'guest';
 
   // Generate a stable new deck order (only used when not resuming)
@@ -127,7 +128,7 @@ export function MemoryMatchScreen({
 
   // Restore or offer resume on mount
   useEffect(() => {
-    loadGameProgress('memoryMatch', levelId, profileId).then(saved => {
+    loadGameProgress('memoryMatch', levelId, profileId).then((saved) => {
       if (saved && saved.deckIds.length > 0) {
         Alert.alert(
           'Resume game?',
@@ -136,9 +137,11 @@ export function MemoryMatchScreen({
             {
               text: 'Start Fresh',
               onPress: (): void => {
-                clearGameProgress('memoryMatch', levelId, profileId).finally(() =>
-                  setLoading(false),
-                );
+                import('../../shared/services/gameProgressCache')
+                  .then(({ clearGameProgress }) =>
+                    clearGameProgress('memoryMatch', levelId, profileId),
+                  )
+                  .finally(() => setLoading(false));
               },
             },
             {
@@ -175,45 +178,28 @@ export function MemoryMatchScreen({
     [levelId, profileId],
   );
 
-  const handleExit = useCallback((): void => {
-    Alert.alert(
-      'Save & Exit',
-      'Your progress has been saved. Continue later?',
-      [
-        { text: 'Keep Playing', style: 'cancel' },
-        {
-          text: 'Exit',
-          style: 'destructive',
-          onPress: (): void => {
-            persist([...matched], flips, deckIds);
-            navigation.goBack();
-          },
-        },
-      ],
-    );
-  }, [matched, flips, deckIds, persist, navigation]);
+  const handleSave = useCallback((): void => {
+    persist([...matched], flips, deckIds);
+  }, [matched, flips, deckIds, persist]);
 
-  const finishGame = useCallback(
+  const handleExit = useExitConfirmation(navigation, handleSave);
+
+  const handleFinishGame = useCallback(
     async (finalFlips: number): Promise<void> => {
-      setSaving(true);
-      await clearGameProgress('memoryMatch', levelId, profileId);
       const stars = flipsToStars(finalFlips);
       const score = Math.max(0, Math.round(100 - (finalFlips - PAIRS) * 3));
-      if (studentProfile) {
-        try {
-          await upsertLevelProgress({
-            studentProfileId: studentProfile.id,
-            islandId,
-            levelId,
-            starsEarned: stars,
-            bestScore: score,
-          });
-        } catch {
-          // Non-fatal
-        }
-      }
-      setSaving(false);
-      navigation.replace('Results', { stars, levelName, islandId, levelId });
+      await finishGame({
+        game: 'memoryMatch',
+        levelId,
+        profileId,
+        studentProfileId: studentProfile?.id,
+        islandId,
+        stars,
+        bestScore: score,
+        setSaving,
+        onComplete: () =>
+          navigation.replace('Results', { stars, levelName, islandId, levelId }),
+      });
     },
     [studentProfile, islandId, levelId, levelName, profileId, navigation],
   );
@@ -221,8 +207,8 @@ export function MemoryMatchScreen({
   const openIds = useMemo(
     () =>
       deck
-        .filter(c => flipped.has(c.id) && !matched.has(c.pairId))
-        .map(c => c.id),
+        .filter((c) => flipped.has(c.id) && !matched.has(c.pairId))
+        .map((c) => c.id),
     [deck, flipped, matched],
   );
 
@@ -230,11 +216,11 @@ export function MemoryMatchScreen({
   useEffect(() => {
     if (matched.size === PAIRS && matched.size > prevMatchedRef.current) {
       prevMatchedRef.current = matched.size;
-      finishGame(flips).catch(() => {});
+      handleFinishGame(flips).catch(() => {});
     } else {
       prevMatchedRef.current = matched.size;
     }
-  }, [matched, flips, finishGame]);
+  }, [matched, flips, handleFinishGame]);
 
   function handleFlip(card: Card): void {
     if (locked) return;
@@ -248,7 +234,7 @@ export function MemoryMatchScreen({
     setFlips(newFlipCount);
 
     if (openIds.length === 1) {
-      const firstCard = deck.find(c => c.id === openIds[0]);
+      const firstCard = deck.find((c) => c.id === openIds[0]);
       if (firstCard && firstCard.pairId === card.pairId) {
         const newMatched = new Set([...matched, card.pairId]);
         setMatched(newMatched);
@@ -256,7 +242,7 @@ export function MemoryMatchScreen({
       } else {
         setLocked(true);
         setTimeout(() => {
-          setFlipped(prev => {
+          setFlipped((prev) => {
             const updated = new Set(prev);
             updated.delete(openIds[0]);
             updated.delete(card.id);
@@ -272,30 +258,30 @@ export function MemoryMatchScreen({
 
   if (loading || saving) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={gameStyles.container}>
         <ActivityIndicator
           size="large"
           color={colors.oceanBlue}
-          style={styles.loader}
+          style={gameStyles.loader}
         />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
+    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
+      <View style={gameStyles.header}>
+        <View style={gameStyles.headerRow}>
           <Pressable
-            style={styles.exitBtn}
+            style={gameStyles.exitBtn}
             onPress={handleExit}
             accessibilityRole="button"
             accessibilityLabel="Save and exit"
           >
-            <Text style={styles.exitText}>✕</Text>
+            <Text style={gameStyles.exitText}>✕</Text>
           </Pressable>
-          <Text style={styles.title}>Memory Match 🃏</Text>
-          <View style={styles.exitBtn} />
+          <Text style={gameStyles.title}>Memory Match 🃏</Text>
+          <View style={gameStyles.exitBtn} />
         </View>
         <Text style={styles.stats}>
           {matched.size} / {PAIRS} pairs · {flips} flips
@@ -303,7 +289,7 @@ export function MemoryMatchScreen({
       </View>
 
       <View style={styles.grid}>
-        {deck.map(card => {
+        {deck.map((card) => {
           const isFlipped = flipped.has(card.id);
           const isMatched = matched.has(card.pairId);
           const faceUp = isFlipped || isMatched;
@@ -345,36 +331,6 @@ export function MemoryMatchScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.softSand },
-  loader: { flex: 1 },
-
-  header: {
-    paddingHorizontal: spacing.screen,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  exitBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exitText: {
-    fontSize: 18,
-    color: '#8A9BAB',
-    fontWeight: typography.fontWeight.medium,
-  },
-  title: {
-    fontSize: typography.fontSize.subheading,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.oceanBlue,
-  },
   stats: {
     fontSize: typography.fontSize.caption,
     color: colors.oliveGreen,
@@ -398,7 +354,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xs,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 4,
@@ -410,9 +366,9 @@ const styles = StyleSheet.create({
     borderColor: colors.oceanBlue,
   },
   cardMatched: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.successBg,
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: colors.success,
   },
   cardBack: {
     fontSize: typography.fontSize.heading,
@@ -426,7 +382,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cardLabelMatched: {
-    color: '#059669',
+    color: colors.successDark,
   },
   cardSub: {
     fontSize: 10,

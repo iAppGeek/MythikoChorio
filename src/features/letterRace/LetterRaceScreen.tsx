@@ -8,26 +8,28 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { Canvas, Path } from '@shopify/react-native-skia';
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
 import { GREEK_LETTERS, CANVAS_SIZE } from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
-import { useTracingCanvas } from '../letterLab/hooks/useTracingCanvas';
-import { calculateTraceAccuracy, scoreToStars } from '../letterLab/utils/traceAccuracy';
-import { upsertLevelProgress } from '../../shared/services/progressService';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
+import { useTracingCanvas } from '../letterLab/hooks/useTracingCanvas';
+import { calculateTraceAccuracy, scoreToStars } from '../letterLab/utils/traceAccuracy';
 import {
   saveGameProgress,
   loadGameProgress,
-  clearGameProgress,
 } from '../../shared/services/gameProgressCache';
+import { buildPathFromStrokes } from '../../shared/utils/skiaPathBuilder';
+import { finishGame } from '../../shared/utils/finishGame';
+import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
 import { useAuthStore } from '../../shared/stores/authStore';
 import { colors } from '../../app/theme/colors';
 import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
+import { gameStyles } from '../../app/theme/gameStyles';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'LetterRace'>;
 
@@ -78,9 +80,11 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
             {
               text: 'Start Fresh',
               onPress: (): void => {
-                clearGameProgress('letterRace', levelId, profileId).finally(() =>
-                  setLoading(false),
-                );
+                import('../../shared/services/gameProgressCache')
+                  .then(({ clearGameProgress }) =>
+                    clearGameProgress('letterRace', levelId, profileId),
+                  )
+                  .finally(() => setLoading(false));
               },
             },
             {
@@ -102,35 +106,17 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
     });
   }, [levelId, profileId]);
 
-  const handleExit = useCallback((): void => {
-    Alert.alert('Save & Exit', 'Your progress has been saved. Continue later?', [
-      { text: 'Keep Playing', style: 'cancel' },
-      {
-        text: 'Exit',
-        style: 'destructive',
-        onPress: (): void => {
-          saveGameProgress('letterRace', levelId, profileId, {
-            letterIds,
-            roundIndex,
-            scores,
-          }).catch(() => {});
-          navigation.goBack();
-        },
-      },
-    ]);
-  }, [letterIds, roundIndex, scores, levelId, profileId, navigation]);
+  const handleSave = useCallback((): void => {
+    saveGameProgress('letterRace', levelId, profileId, {
+      letterIds,
+      roundIndex,
+      scores,
+    }).catch(() => {});
+  }, [letterIds, roundIndex, scores, levelId, profileId]);
 
-  const userPath = useMemo(() => {
-    const p = Skia.Path.Make();
-    for (const stroke of strokes) {
-      if (stroke.length === 0) continue;
-      p.moveTo(stroke[0].x, stroke[0].y);
-      for (let i = 1; i < stroke.length; i++) {
-        p.lineTo(stroke[i].x, stroke[i].y);
-      }
-    }
-    return p;
-  }, [strokes]);
+  const handleExit = useExitConfirmation(navigation, handleSave);
+
+  const userPath = useMemo(() => buildPathFromStrokes(strokes), [strokes]);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -158,27 +144,22 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
     };
   }, [phase, roundIndex, submitRound]);
 
-  const finishGame = useCallback(
+  const handleFinishGame = useCallback(
     async (allScores: number[]): Promise<void> => {
-      setSaving(true);
-      await clearGameProgress('letterRace', levelId, profileId);
       const avg = Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
       const stars = scoreToStars(avg);
-      if (studentProfile) {
-        try {
-          await upsertLevelProgress({
-            studentProfileId: studentProfile.id,
-            islandId,
-            levelId,
-            starsEarned: stars,
-            bestScore: avg,
-          });
-        } catch {
-          // Non-fatal
-        }
-      }
-      setSaving(false);
-      navigation.replace('Results', { stars, levelName, islandId, levelId });
+      await finishGame({
+        game: 'letterRace',
+        levelId,
+        profileId,
+        studentProfileId: studentProfile?.id,
+        islandId,
+        stars,
+        bestScore: avg,
+        setSaving,
+        onComplete: () =>
+          navigation.replace('Results', { stars, levelName, islandId, levelId }),
+      });
     },
     [studentProfile, islandId, levelId, levelName, profileId, navigation],
   );
@@ -188,7 +169,7 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
     setScores(newScores);
     const next = roundIndex + 1;
     if (next >= total) {
-      finishGame(newScores).catch(() => {});
+      handleFinishGame(newScores).catch(() => {});
     } else {
       const nextIndex = next;
       setRoundIndex(nextIndex);
@@ -206,32 +187,32 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
 
   if (loading || saving) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.oceanBlue} style={styles.loader} />
+      <SafeAreaView style={gameStyles.container}>
+        <ActivityIndicator size="large" color={colors.oceanBlue} style={gameStyles.loader} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
+    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
+      <View style={gameStyles.header}>
+        <View style={gameStyles.headerRow}>
           <Pressable
-            style={styles.exitBtn}
+            style={gameStyles.exitBtn}
             onPress={handleExit}
             accessibilityRole="button"
             accessibilityLabel="Save and exit">
-            <Text style={styles.exitText}>✕</Text>
+            <Text style={gameStyles.exitText}>✕</Text>
           </Pressable>
-          <Text style={styles.title}>Letter Race 👑</Text>
-          <View style={styles.exitBtn} />
+          <Text style={gameStyles.title}>Letter Race 👑</Text>
+          <View style={gameStyles.exitBtn} />
         </View>
-        <Text style={styles.subtitle}>
+        <Text style={gameStyles.subtitle}>
           {roundIndex + 1} / {total}
         </Text>
-        <View style={styles.progressTrack}>
+        <View style={gameStyles.progressTrack}>
           <View
-            style={[styles.progressFill, { width: `${((roundIndex + 1) / total) * 100}%` }]}
+            style={[gameStyles.progressFill, { width: `${((roundIndex + 1) / total) * 100}%` }]}
           />
         </View>
       </View>
@@ -252,7 +233,7 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
             </View>
 
             <GestureDetector gesture={gesture}>
-              <View style={styles.canvasWrapper}>
+              <View style={[gameStyles.canvasWrapper, gameStyles.canvasWrapperBordered]}>
                 <Canvas style={styles.canvas}>
                   <Path
                     path={userPath}
@@ -266,25 +247,25 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
               </View>
             </GestureDetector>
 
-            <View style={styles.row}>
+            <View style={gameStyles.row}>
               <Pressable
-                style={({ pressed }) => [styles.btnSecondary, pressed && styles.btnPressed]}
+                style={({ pressed }) => [gameStyles.btnSecondary, pressed && gameStyles.btnPressed]}
                 onPress={reset}
                 accessibilityRole="button"
                 accessibilityLabel="Clear">
-                <Text style={styles.btnSecondaryText}>Clear</Text>
+                <Text style={gameStyles.btnSecondaryText}>Clear</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [
-                  styles.btn,
-                  isEmpty && styles.btnDisabled,
-                  pressed && !isEmpty && styles.btnPressed,
+                  gameStyles.btn,
+                  isEmpty && gameStyles.btnDisabled,
+                  pressed && !isEmpty && gameStyles.btnPressed,
                 ]}
                 onPress={isEmpty ? undefined : submitRound}
                 accessibilityRole="button"
                 accessibilityLabel="Submit"
                 accessibilityState={{ disabled: isEmpty }}>
-                <Text style={styles.btnText}>Submit ✓</Text>
+                <Text style={gameStyles.btnText}>Submit ✓</Text>
               </Pressable>
             </View>
           </>
@@ -297,11 +278,11 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
             <Text style={styles.accuracyText}>{roundAccuracy}% accuracy</Text>
 
             <Pressable
-              style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
+              style={({ pressed }) => [gameStyles.btn, pressed && gameStyles.btnPressed]}
               onPress={handleNext}
               accessibilityRole="button"
               accessibilityLabel={roundIndex + 1 >= total ? 'Finish' : 'Next letter'}>
-              <Text style={styles.btnText}>
+              <Text style={gameStyles.btnText}>
                 {roundIndex + 1 >= total ? 'Finish 🏁' : 'Next →'}
               </Text>
             </Pressable>
@@ -313,55 +294,6 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.softSand },
-  loader: { flex: 1 },
-
-  header: {
-    paddingHorizontal: spacing.screen,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  exitBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exitText: {
-    fontSize: 18,
-    color: '#8A9BAB',
-    fontWeight: typography.fontWeight.medium,
-  },
-  title: {
-    fontSize: typography.fontSize.subheading,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.oceanBlue,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: typography.fontSize.caption,
-    color: colors.oliveGreen,
-    textAlign: 'center',
-  },
-  progressTrack: {
-    width: '100%',
-    height: 6,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.sunshineYellow,
-    borderRadius: 3,
-  },
-
   body: {
     flex: 1,
     alignItems: 'center',
@@ -400,7 +332,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timerUrgent: {
-    borderColor: '#EF4444',
+    borderColor: colors.error,
   },
   timerText: {
     fontSize: typography.fontSize.body,
@@ -408,56 +340,12 @@ const styles = StyleSheet.create({
     color: colors.oceanBlue,
   },
   timerTextUrgent: {
-    color: '#EF4444',
+    color: colors.error,
   },
 
-  canvasWrapper: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.cloudWhite,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   canvas: {
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
-  },
-
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  btn: {
-    backgroundColor: colors.oceanBlue,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.45 },
-  btnPressed: { opacity: 0.75 },
-  btnText: {
-    color: colors.cloudWhite,
-    fontSize: typography.fontSize.body,
-    fontWeight: typography.fontWeight.bold,
-  },
-  btnSecondary: {
-    borderWidth: 2,
-    borderColor: colors.oceanBlue,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  btnSecondaryText: {
-    color: colors.oceanBlue,
-    fontSize: typography.fontSize.body,
-    fontWeight: typography.fontWeight.semibold,
   },
 
   resultEmoji: { fontSize: 56 },

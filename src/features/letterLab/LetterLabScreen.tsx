@@ -12,16 +12,17 @@ import { GuidedTraceStep } from './steps/GuidedTraceStep';
 import { FreeWriteStep } from './steps/FreeWriteStep';
 import { LetterChallengeStep } from './steps/LetterChallengeStep';
 import { scoreToStars } from './utils/traceAccuracy';
-import { upsertLevelProgress } from '../../shared/services/progressService';
 import {
   saveGameProgress,
   loadGameProgress,
   clearGameProgress,
 } from '../../shared/services/gameProgressCache';
+import { finishGame } from '../../shared/utils/finishGame';
+import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
 import { useAuthStore } from '../../shared/stores/authStore';
 import { colors } from '../../app/theme/colors';
-import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
+import { gameStyles } from '../../app/theme/gameStyles';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'LetterLab'>;
 
@@ -99,25 +100,16 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
     [levelId, profileId],
   );
 
-  const handleExit = useCallback((): void => {
-    Alert.alert('Save & Exit', 'Your progress has been saved. Continue later?', [
-      { text: 'Keep Playing', style: 'cancel' },
-      {
-        text: 'Exit',
-        style: 'destructive',
-        onPress: (): void => {
-          persistProgress(letterIndex, stepIndex);
-          navigation.goBack();
-        },
-      },
-    ]);
-  }, [letterIndex, stepIndex, persistProgress, navigation]);
+  const handleSave = useCallback((): void => {
+    persistProgress(letterIndex, stepIndex);
+  }, [letterIndex, stepIndex, persistProgress]);
+
+  const handleExit = useExitConfirmation(navigation, handleSave);
 
   const letter = GREEK_LETTERS[letterIndex];
   const currentStep = steps[stepIndex];
 
   const finishLevel = useCallback(async (): Promise<void> => {
-    setSaving(true);
     const allScores = scoresRef.current;
     const avgScore =
       allScores.length > 0
@@ -125,24 +117,18 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
         : 100;
     const stars = scoreToStars(avgScore);
 
-    await clearGameProgress('letterLab', levelId, profileId);
-
-    if (studentProfile) {
-      try {
-        await upsertLevelProgress({
-          studentProfileId: studentProfile.id,
-          islandId,
-          levelId,
-          starsEarned: stars,
-          bestScore: avgScore,
-        });
-      } catch {
-        // Non-fatal
-      }
-    }
-
-    setSaving(false);
-    navigation.replace('Results', { stars, levelName, islandId, levelId });
+    await finishGame({
+      game: 'letterLab',
+      levelId,
+      profileId,
+      studentProfileId: studentProfile?.id,
+      islandId,
+      stars,
+      bestScore: avgScore,
+      setSaving,
+      onComplete: () =>
+        navigation.replace('Results', { stars, levelName, islandId, levelId }),
+    });
   }, [studentProfile, islandId, levelId, levelName, profileId, navigation]);
 
   const advanceStep = useCallback(
@@ -180,8 +166,8 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
 
   if (loading || saving) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.oceanBlue} style={styles.loader} />
+      <SafeAreaView style={gameStyles.container}>
+        <ActivityIndicator size="large" color={colors.oceanBlue} style={gameStyles.loader} />
       </SafeAreaView>
     );
   }
@@ -189,24 +175,24 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
   const progressText = `${letter.char} · ${letterIndex + 1} / ${GREEK_LETTERS.length}`;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
+    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
+      <View style={gameStyles.header}>
+        <View style={gameStyles.headerRow}>
           <Pressable
-            style={styles.exitBtn}
+            style={gameStyles.exitBtn}
             onPress={handleExit}
             accessibilityRole="button"
             accessibilityLabel="Save and exit">
-            <Text style={styles.exitText}>✕</Text>
+            <Text style={gameStyles.exitText}>✕</Text>
           </Pressable>
           <Text style={styles.progress}>{progressText}</Text>
           {/* Spacer to centre the progress text */}
-          <View style={styles.exitBtn} />
+          <View style={gameStyles.exitBtn} />
         </View>
-        <View style={styles.progressTrack}>
+        <View style={gameStyles.progressTrack}>
           <View
             style={[
-              styles.progressFill,
+              gameStyles.progressFill,
               { width: `${((letterIndex + 1) / GREEK_LETTERS.length) * 100}%` },
             ]}
           />
@@ -243,52 +229,11 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.softSand,
-  },
-  loader: {
-    flex: 1,
-  },
-
-  header: {
-    paddingHorizontal: spacing.screen,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  exitBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exitText: {
-    fontSize: 18,
-    color: '#8A9BAB',
-    fontWeight: typography.fontWeight.medium,
-  },
   progress: {
     fontSize: typography.fontSize.caption,
     color: colors.oliveGreen,
     fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.sunshineYellow,
-    borderRadius: 3,
   },
   stepDots: {
     flexDirection: 'row',
@@ -300,7 +245,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: colors.dotInactive,
   },
   dotActive: {
     backgroundColor: colors.oceanBlue,

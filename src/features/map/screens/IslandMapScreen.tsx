@@ -188,7 +188,7 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#B8DEFF',
+    backgroundColor: colors.mapSky,
   },
 
   // ── Header
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    backgroundColor: '#B8DEFF',
+    backgroundColor: colors.mapSky,
   },
 
   // ── Island marker
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderRadius: ISLAND_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
@@ -280,9 +280,9 @@ const styles = StyleSheet.create({
     borderColor: colors.sunshineYellow,
   },
   islandLocked: {
-    backgroundColor: '#C8D6E5',
+    backgroundColor: colors.lockedBg,
     borderWidth: 3,
-    borderColor: '#A0B0C0',
+    borderColor: colors.lockedBorder,
     opacity: 0.7,
   },
   islandEmoji: {
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     width: ISLAND_SIZE + spacing.lg,
   },
   islandLabelLocked: {
-    color: '#7A8A9A',
+    color: colors.lockedLabel,
   },
 
   // ── Bottom nav
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.cloudWhite,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: colors.border,
   },
   navItem: {
     flex: 1,

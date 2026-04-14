@@ -31,7 +31,7 @@ export type LetterRaceCache = {
   scores: number[];
 };
 
-type CacheMap = {
+export type CacheMap = {
   letterLab: LetterLabCache;
   soundSafari: SoundSafariCache;
   memoryMatch: MemoryMatchCache;
