@@ -155,6 +155,18 @@ CREATE TABLE souvenirs (
 CREATE INDEX ON souvenirs (student_profile_id);
 
 
+-- ─── RLS Helper ──────────────────────────────────────────────────────────────
+-- Reads app_users with SECURITY DEFINER (bypasses RLS) so that policies on
+-- other tables can check the caller's role without causing infinite recursion.
+-- Without this, any policy that queries app_users would trigger app_users'
+-- own policies, which in turn query app_users — an infinite loop.
+
+CREATE OR REPLACE FUNCTION get_auth_user_role()
+RETURNS text AS $$
+  SELECT role FROM app_users WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+
 -- ─── Row Level Security ──────────────────────────────────────────────────────
 
 ALTER TABLE app_users              ENABLE ROW LEVEL SECURITY;
@@ -167,29 +179,29 @@ ALTER TABLE souvenirs              ENABLE ROW LEVEL SECURITY;
 -- app_users
 CREATE POLICY user_read_own      ON app_users FOR SELECT USING (id = auth.uid());
 CREATE POLICY user_update_own    ON app_users FOR UPDATE USING (id = auth.uid());
-CREATE POLICY admin_all_users    ON app_users FOR ALL    USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY teacher_read_users ON app_users FOR SELECT USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role = 'teacher'));
+CREATE POLICY admin_all_users    ON app_users FOR ALL    USING (get_auth_user_role() = 'admin');
+CREATE POLICY teacher_read_users ON app_users FOR SELECT USING (get_auth_user_role() = 'teacher');
 
 -- external_system_links
-CREATE POLICY admin_all_links      ON external_system_links FOR ALL    USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY admin_all_links      ON external_system_links FOR ALL    USING (get_auth_user_role() = 'admin');
 CREATE POLICY user_read_own_links  ON external_system_links FOR SELECT USING (app_user_id = auth.uid());
-CREATE POLICY teacher_read_links   ON external_system_links FOR SELECT USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role = 'teacher'));
+CREATE POLICY teacher_read_links   ON external_system_links FOR SELECT USING (get_auth_user_role() = 'teacher');
 
 -- student_profiles
 CREATE POLICY player_own_profile    ON student_profiles FOR ALL    USING (auth_user_id = auth.uid());
-CREATE POLICY teacher_read_profiles ON student_profiles FOR SELECT USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role IN ('teacher', 'admin')));
+CREATE POLICY teacher_read_profiles ON student_profiles FOR SELECT USING (get_auth_user_role() IN ('teacher', 'admin'));
 
 -- game_scores
 CREATE POLICY player_own_scores    ON game_scores FOR ALL    USING (student_profile_id IN (SELECT id FROM student_profiles WHERE auth_user_id = auth.uid()));
-CREATE POLICY teacher_read_scores  ON game_scores FOR SELECT USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role IN ('teacher', 'admin')));
+CREATE POLICY teacher_read_scores  ON game_scores FOR SELECT USING (get_auth_user_role() IN ('teacher', 'admin'));
 
 -- island_progress
 CREATE POLICY player_own_progress   ON island_progress FOR ALL    USING (student_profile_id IN (SELECT id FROM student_profiles WHERE auth_user_id = auth.uid()));
-CREATE POLICY teacher_read_progress ON island_progress FOR SELECT USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role IN ('teacher', 'admin')));
+CREATE POLICY teacher_read_progress ON island_progress FOR SELECT USING (get_auth_user_role() IN ('teacher', 'admin'));
 
 -- souvenirs
 CREATE POLICY player_own_souvenirs   ON souvenirs FOR ALL    USING (student_profile_id IN (SELECT id FROM student_profiles WHERE auth_user_id = auth.uid()));
-CREATE POLICY teacher_read_souvenirs ON souvenirs FOR SELECT USING (EXISTS (SELECT 1 FROM app_users WHERE id = auth.uid() AND role IN ('teacher', 'admin')));
+CREATE POLICY teacher_read_souvenirs ON souvenirs FOR SELECT USING (get_auth_user_role() IN ('teacher', 'admin'));
 
 
 -- ─── Functions ───────────────────────────────────────────────────────────────

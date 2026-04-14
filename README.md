@@ -75,20 +75,20 @@ sdk.dir=/Users/<you>/Library/Android/sdk
 
 ```bash
 # iOS simulator
-npx react-native run-ios
+npm run ios
 
 # Android emulator (start AVD first)
-npx react-native run-android
+npm run android
 
 # Metro bundler (separate terminal)
-npx react-native start
+npm run start
 ```
 
 ---
 
 ## Database Setup
 
-This app uses its own dedicated Supabase project — it does not share a database with any other system.
+This app uses its own dedicated Supabase project
 
 1. Create a new Supabase project
 2. Open the SQL editor and run `supabase/schema.sql` — this creates all tables, RLS policies, and functions from scratch

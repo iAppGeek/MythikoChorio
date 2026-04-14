@@ -1,18 +1,6 @@
-export type DeviceType = 'phone' | 'tablet';
+import type { Tables } from '../../types/database';
 
-export type GameScore = {
-  id: string;
-  student_profile_id: string;
-  game_type: string;
-  island_id: string;
-  level_id: string;
-  score: number;
-  accuracy: number | null;
-  time_spent_secs: number | null;
-  hints_used: number;
-  attempts: number;
-  device_type: DeviceType | null;
-  details: Record<string, unknown> | null;
-  completed_at: string;
-  created_at: string;
-};
+export type GameScore = Tables<'game_scores'>;
+
+// Narrower type used when constructing inserts — keeps device_type human-readable.
+export type DeviceType = 'phone' | 'tablet';
