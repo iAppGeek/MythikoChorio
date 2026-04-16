@@ -1,9 +1,7 @@
 # OSX
-#
 .DS_Store
 
 # Xcode
-#
 build/
 *.pbxuser
 !default.pbxuser
@@ -23,7 +21,6 @@ DerivedData
 **/.xcode.env.local
 
 # Android/IntelliJ
-#
 build/
 .idea
 .gradle
@@ -36,7 +33,6 @@ local.properties
 .kotlin/
 
 # node.js
-#
 node_modules/
 npm-debug.log
 yarn-error.log
@@ -55,6 +51,7 @@ yarn-error.log
 
 # Bundle artifact
 *.jsbundle
+supabase/.temp
 
 # Ruby / CocoaPods
 **/Pods/
@@ -78,6 +75,9 @@ yarn-error.log
 .env
 .env.local
 .env.*.local
+
+# Supabase credentials — copy src/config.example.ts → src/config.ts and fill in
+src/config.ts
 
 # IDE
 .vscode/

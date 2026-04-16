@@ -20,22 +20,29 @@ jest.mock('@react-navigation/native-stack', () => ({
   }),
 }));
 
-jest.mock('react-native-gesture-handler', () => ({
-  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) =>
-    children,
-}));
-
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 jest.mock('react-native-url-polyfill/auto', () => {});
-jest.mock('react-native-config', () => ({
-  SUPABASE_URL: 'https://mock.supabase.co',
-  SUPABASE_ANON_KEY: 'mock-anon-key',
+jest.mock('../src/config', () => ({
+  config: {
+    supabaseUrl: 'https://mock.supabase.co',
+    supabaseAnonKey: 'mock-anon-key',
+  },
 }));
 jest.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({}),
+  createClient: () => ({
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: jest.fn() } } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => Promise.resolve({ data: [], error: null }),
+      }),
+    }),
+  }),
 }));
 jest.mock('@react-native-async-storage/async-storage', () => ({}));
 

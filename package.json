@@ -4,10 +4,14 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "ios": "react-native run-ios",
+    "ios": "LANG=en_US.UTF-8 react-native run-ios",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "e2e:build": "LANG=en_US.UTF-8 detox build -c ios.sim.debug",
+    "e2e": "detox test -c ios.sim.debug",
+    "postinstall": "mkdir -p node_modules/@react-native-async-storage/async-storage/apple && cp -n scripts/PrivacyInfo.xcprivacy node_modules/@react-native-async-storage/async-storage/apple/PrivacyInfo.xcprivacy 2>/dev/null || true"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -29,6 +33,7 @@
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-sound": "^0.13.0",
+    "react-native-splash-screen": "^3.3.0",
     "react-native-svg": "^15.15.4",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-worklets": "^0.8.1",
@@ -49,6 +54,7 @@
     "@types/jest": "^29.5.13",
     "@types/react": "^19.2.0",
     "@types/react-test-renderer": "^19.1.0",
+    "detox": "^20.50.1",
     "eslint": "^8.19.0",
     "jest": "^29.6.3",
     "prettier": "2.8.8",
