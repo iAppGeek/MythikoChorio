@@ -76,9 +76,6 @@ supabase/.temp
 .env.local
 .env.*.local
 
-# Supabase credentials — copy src/config.example.ts → src/config.ts and fill in
-src/config.ts
-
 # IDE
 .vscode/
 .idea/

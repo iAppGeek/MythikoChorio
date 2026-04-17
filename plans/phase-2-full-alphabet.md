@@ -10,7 +10,7 @@
 
 ## Tasks
 
-- [ ] Implement Beta Island (letters Ν–Ω)
+- [x] Implement Beta Island (letters Ν–Ω)
 - [ ] Build Word Bubbles game type
 - [ ] Build Sound Safari game type
 - [ ] Build Picture Hunt game type
@@ -19,6 +19,40 @@
 - [ ] Implement the Backpack (souvenir collection) screen
 - [ ] Add daily streak tracking
 - [ ] Tablet layout for Letter Lab (split-screen canvas + reference)
+
+---
+
+## Progress log
+
+### 2026-04-17 — Beta Island foundation landed
+- `src/data/alphabet/letterData.ts` — added stroke polylines for Ν, Ξ, Ο, Π, Ρ, Σ, Τ, Υ, Φ, Χ, Ψ, Ω in the existing 280×280 format (single uppercase case, matching Α–Μ). Added `getLettersForIsland(islandId)` plus `ALPHA_ISLAND_LETTER_IDS` / `BETA_ISLAND_LETTER_IDS` sets.
+- `src/data/islands/levelConfig.ts` — added `BETA_LEVELS` (Meet / Trace / Letter Sounds / Letter Match / Letter Race) and an `isIslandCleared(islandId, starsByLevel)` helper.
+- `src/data/islands/islandConfig.ts` — `getUnlockedIslands` now takes a `Set<IslandId>` of cleared islands and cascades unlocks via each island's `unlockAfter`.
+- `src/features/map/screens/IslandMapScreen.tsx` — fetches all progress on focus, derives which islands are cleared, drives unlock state. Beta unlocks once all 5 Alpha levels have ≥1 star.
+- `src/shared/services/progressService.ts` — new `getAllProgress(studentProfileId)`.
+- `src/features/letterLab/LetterLabScreen.tsx`, `memoryMatch/MemoryMatchScreen.tsx`, `letterRace/LetterRaceScreen.tsx`, `soundSafari/SoundSafariScreen.tsx` — now pull letters via `getLettersForIsland(islandId)` so Alpha plays Α–Μ and Beta plays Ν–Ω. `STEPS_BY_LEVEL` in Letter Lab extended with `beta_meet_letters` / `beta_trace_letters`.
+
+Verified: `npx tsc --noEmit` clean; `npm test` → 3 suites, 14 tests passing.
+
+### What's still open (pick up here)
+- **Word Bubbles** (task 2): folder `src/features/games/wordBubbles/` exists but is empty. Needs game screen, Reanimated bubble physics, picture-hint word targets, and silent scoring `{ wordsCompleted, wordsWithoutError, avgLetterRecognitionMs }`.
+- **Sound Safari rework** (task 3): `src/features/soundSafari/SoundSafariScreen.tsx` already exists from Phase 1 but uses the Phase-1 format (letter shown → pick sound description). Phase 2 spec wants audio-first (play sound → tap picture/letter option) with streak counter and new `details` JSONB: `{ correctFirstTry, avgResponseTimeMs, confusedPairs }`. Decide: rebuild vs extend.
+- **Picture Hunt** (task 4): `src/features/games/pictureHunt/` empty. Needs scene illustrations (placeholders for now), tap-to-find objects, `{ correctFirstTap, avgTimePerItem, categoryBreakdown }` scoring.
+- **Audio service + Jukebox** (task 5): no `audioService.ts` yet, `src/features/jukebox/` and `src/data/songs/` are empty. Need `react-native-sound` wrapper, `songConfig.ts`, and a JukeboxScreen. Assets (alphabet song, letter pronunciation audio, SFX) are not yet provided.
+- **Backpack** (task 6): `src/features/rewards/` empty. Needs `BackpackScreen` reading from the `souvenirs` table, grid of collected/mystery slots, detail card on tap. Alpha → "Golden Alpha", Beta → "Omega Crown" (awarded on island clear).
+- **Daily streak** (task 7): `student_profiles.streak_days` and `last_active` already exist. Need: on app open, reconcile streak (yesterday → +1, today → noop, >1 day → reset to 1); Zustand slice; header chip on Island Map (the header already renders `streak_days`, but nothing currently updates it); milestone Lottie at 7 / 30 days.
+- **Tablet layout for Letter Lab** (task 8): gate on `isTablet` from `src/app/theme/responsive.ts`; on tablets split canvas (60%) and reference panel (40%) with target letter, stroke order, name, play-sound button.
+
+### Navigation + wiring still needed
+- `PlayerStackParamList` in `src/app/navigationTypes.ts` has no routes for `WordBubbles`, `PictureHunt`, `Jukebox`, or `Backpack` yet.
+- `IslandMapScreen` bottom nav Jukebox/Backpack buttons are not wired to `navigation.navigate(...)`.
+- `GAME_SCREEN` / `GAME_EMOJI` maps in `IslandLevelSelectScreen` and the `GameType` union in `levelConfig.ts` will need `wordBubbles` / `pictureHunt` entries when those games are introduced to any island's levels.
+
+### Asset gaps (blocking full polish)
+- No audio assets yet (alphabet song, per-letter pronunciation, game SFX).
+- No Lottie files for streak milestones.
+- No scene illustrations for Picture Hunt.
+- No souvenir illustrations.
 
 ---
 

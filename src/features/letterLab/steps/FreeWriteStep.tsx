@@ -4,7 +4,7 @@ import { Canvas, Path } from '@shopify/react-native-skia';
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { GreekLetter } from '../../../data/alphabet/letterData';
 import { CANVAS_SIZE } from '../../../data/alphabet/letterData';
-import { useTracingCanvas } from '../hooks/useTracingCanvas';
+import { useTracingCanvas } from '../../../shared/hooks/useTracingCanvas';
 import { buildPathFromStrokes } from '../../../shared/utils/skiaPathBuilder';
 import { colors } from '../../../app/theme/colors';
 import { typography } from '../../../app/theme/typography';

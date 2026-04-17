@@ -1,11 +1,16 @@
 /**
  * Shared Skia path construction from stroke point arrays.
  * Used by GuidedTraceStep, FreeWriteStep, WatchItWriteStep, LetterRaceScreen.
+ *
+ * `Point` / `Stroke` are the canonical geometry types for tracing — every
+ * tracing-aware module (letterData, useTracingCanvas, traceAccuracy) should
+ * import them from here.
  */
 import { Skia } from '@shopify/react-native-skia';
 import type { SkPath } from '@shopify/react-native-skia';
 
-type Point = { x: number; y: number };
+export type Point = { x: number; y: number };
+export type Stroke = Point[];
 
 /** Build a Skia path from an array of stroke point arrays. */
 export function buildPathFromStrokes(strokes: readonly Point[][]): SkPath {

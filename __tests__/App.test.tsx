@@ -25,11 +25,16 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('react-native-url-polyfill/auto', () => {});
-jest.mock('../src/config', () => ({
-  config: {
-    supabaseUrl: 'https://mock.supabase.co',
-    supabaseAnonKey: 'mock-anon-key',
+jest.mock('react-native-config', () => ({
+  __esModule: true,
+  default: {
+    SUPABASE_URL: 'https://mock.supabase.co',
+    SUPABASE_ANON_KEY: 'mock-anon-key',
   },
+}));
+jest.mock('react-native-splash-screen', () => ({
+  __esModule: true,
+  default: { hide: jest.fn(), show: jest.fn() },
 }));
 jest.mock('@supabase/supabase-js', () => ({
   createClient: () => ({

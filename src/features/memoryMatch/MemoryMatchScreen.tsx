@@ -15,32 +15,29 @@ import {
   View,
   Text,
   Pressable,
-  Alert,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
-import { GREEK_LETTERS } from '../../data/alphabet/letterData';
+import {
+  GREEK_LETTERS,
+  getLettersForIsland,
+} from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
-import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
 import {
-  saveGameProgress,
-  loadGameProgress,
-} from '../../shared/services/gameProgressCache';
-import { finishGame } from '../../shared/utils/finishGame';
-import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
-import { useAuthStore } from '../../shared/stores/authStore';
+  useGameSession,
+  useResumeGame,
+} from '../games/shared/useGameSession';
+import { GameShell } from '../games/shared/GameShell';
 import { colors } from '../../app/theme/colors';
 import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
-import { gameStyles } from '../../app/theme/gameStyles';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'MemoryMatch'>;
 
 const PAIRS = 8;
+const COLS = 4;
 
 type Card = {
   id: string;
@@ -100,16 +97,20 @@ export function MemoryMatchScreen({
   navigation,
 }: Props): React.JSX.Element {
   const { islandId, levelId } = route.params;
-  const levelName =
-    getLevelsForIsland(islandId as IslandId).find((l) => l.id === levelId)
-      ?.name ?? levelId;
-  const studentProfile = useAuthStore((s) => s.studentProfile);
-  const profileId = studentProfile?.id ?? 'guest';
 
-  // Generate a stable new deck order (only used when not resuming)
+  const session = useGameSession({
+    game: 'memoryMatch',
+    islandId,
+    levelId,
+    navigation,
+  });
+
   const freshLetters = useMemo(
-    () => [...GREEK_LETTERS].sort(() => Math.random() - 0.5).slice(0, PAIRS),
-    [],
+    () =>
+      [...getLettersForIsland(islandId as IslandId)]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, PAIRS),
+    [islandId],
   );
   const freshDeckIds = useMemo(
     () => newShuffledDeckIds(freshLetters),
@@ -121,47 +122,18 @@ export function MemoryMatchScreen({
   const [matched, setMatched] = useState<Set<string>>(new Set());
   const [flips, setFlips] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const deck = useMemo(() => buildDeckFromIds(deckIds), [deckIds]);
 
-  // Restore or offer resume on mount
-  useEffect(() => {
-    loadGameProgress('memoryMatch', levelId, profileId).then((saved) => {
-      if (saved && saved.deckIds.length > 0) {
-        Alert.alert(
-          'Resume game?',
-          'You have an unfinished game. Would you like to continue or start fresh?',
-          [
-            {
-              text: 'Start Fresh',
-              onPress: (): void => {
-                import('../../shared/services/gameProgressCache')
-                  .then(({ clearGameProgress }) =>
-                    clearGameProgress('memoryMatch', levelId, profileId),
-                  )
-                  .finally(() => setLoading(false));
-              },
-            },
-            {
-              text: 'Continue',
-              style: 'default',
-              onPress: (): void => {
-                setDeckIds(saved.deckIds);
-                setMatched(new Set(saved.matched));
-                setFlips(saved.flips);
-                setLoading(false);
-              },
-            },
-          ],
-          { cancelable: false },
-        );
-      } else {
-        setLoading(false);
-      }
-    });
-  }, [levelId, profileId]);
+  useResumeGame(
+    session,
+    (saved) => saved.deckIds.length > 0,
+    (saved) => {
+      setDeckIds(saved.deckIds);
+      setMatched(new Set(saved.matched));
+      setFlips(saved.flips);
+    },
+  );
 
   const persist = useCallback(
     (
@@ -169,39 +141,40 @@ export function MemoryMatchScreen({
       currentFlips: number,
       currentDeckIds: string[],
     ): void => {
-      saveGameProgress('memoryMatch', levelId, profileId, {
-        deckIds: currentDeckIds,
-        matched: currentMatched,
-        flips: currentFlips,
-      }).catch(() => {});
+      session
+        .save({
+          deckIds: currentDeckIds,
+          matched: currentMatched,
+          flips: currentFlips,
+        })
+        .catch(() => {});
     },
-    [levelId, profileId],
+    [session],
   );
 
   const handleSave = useCallback((): void => {
     persist([...matched], flips, deckIds);
   }, [matched, flips, deckIds, persist]);
 
-  const handleExit = useExitConfirmation(navigation, handleSave);
+  const handleExit = useMemo(
+    () => session.makeExitHandler(handleSave),
+    [session, handleSave],
+  );
 
   const handleFinishGame = useCallback(
     async (finalFlips: number): Promise<void> => {
       const stars = flipsToStars(finalFlips);
       const score = Math.max(0, Math.round(100 - (finalFlips - PAIRS) * 3));
-      await finishGame({
-        game: 'memoryMatch',
-        levelId,
-        profileId,
-        studentProfileId: studentProfile?.id,
-        islandId,
+      await session.finish({
         stars,
         bestScore: score,
-        setSaving,
-        onComplete: () =>
-          navigation.replace('Results', { stars, levelName, islandId, levelId }),
+        scoreDetails: {
+          score,
+          attempts: finalFlips,
+        },
       });
     },
-    [studentProfile, islandId, levelId, levelName, profileId, navigation],
+    [session],
   );
 
   const openIds = useMemo(
@@ -254,40 +227,17 @@ export function MemoryMatchScreen({
     }
   }
 
-  const COLS = 4;
-
-  if (loading || saving) {
-    return (
-      <SafeAreaView style={gameStyles.container}>
-        <ActivityIndicator
-          size="large"
-          color={colors.oceanBlue}
-          style={gameStyles.loader}
-        />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
-      <View style={gameStyles.header}>
-        <View style={gameStyles.headerRow}>
-          <Pressable
-            style={gameStyles.exitBtn}
-            onPress={handleExit}
-            accessibilityRole="button"
-            accessibilityLabel="Save and exit"
-          >
-            <Text style={gameStyles.exitText}>✕</Text>
-          </Pressable>
-          <Text style={gameStyles.title}>Memory Match 🃏</Text>
-          <View style={gameStyles.exitBtn} />
-        </View>
+    <GameShell
+      title="Memory Match 🃏"
+      onExit={handleExit}
+      loading={session.loading}
+      saving={session.saving}
+      headerExtras={
         <Text style={styles.stats}>
           {matched.size} / {PAIRS} pairs · {flips} flips
         </Text>
-      </View>
-
+      }>
       <View style={styles.grid}>
         {deck.map((card) => {
           const isFlipped = flipped.has(card.id);
@@ -305,16 +255,14 @@ export function MemoryMatchScreen({
               onPress={() => handleFlip(card)}
               accessibilityRole="button"
               accessibilityLabel={faceUp ? card.label : 'Hidden card'}
-              disabled={faceUp || locked}
-            >
+              disabled={faceUp || locked}>
               {faceUp ? (
                 <>
                   <Text
                     style={[
                       styles.cardLabel,
                       isMatched && styles.cardLabelMatched,
-                    ]}
-                  >
+                    ]}>
                     {card.label}
                   </Text>
                   <Text style={styles.cardSub}>{card.sublabel}</Text>
@@ -326,7 +274,7 @@ export function MemoryMatchScreen({
           );
         })}
       </View>
-    </SafeAreaView>
+    </GameShell>
   );
 }
 

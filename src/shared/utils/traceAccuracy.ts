@@ -1,5 +1,5 @@
-import type { Point, Stroke } from '../../../data/alphabet/letterData';
-import { CANVAS_SIZE } from '../../../data/alphabet/letterData';
+import type { Point, Stroke } from './skiaPathBuilder';
+import { CANVAS_SIZE } from '../../data/alphabet/letterData';
 
 const GRID = 20;
 const CELL = CANVAS_SIZE / GRID;

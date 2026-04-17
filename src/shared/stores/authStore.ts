@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import { supabase } from '../services/supabaseClient';
+import {
+  supabase,
+  MISSING_SUPABASE_ENV_MESSAGE,
+} from '../services/supabaseClient';
 import {
   signInAnonymously,
   createGuestProfile,
@@ -39,6 +42,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
   studentProfile: null,
 
   loadSession: async (): Promise<void> => {
+    if (!supabase) {
+      console.warn(MISSING_SUPABASE_ENV_MESSAGE);
+      set({ status: 'unauthenticated', authUserId: null, studentProfile: null });
+      return;
+    }
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -64,6 +73,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   signInAsGuest: async (displayName: string, age: number): Promise<void> => {
+    if (!supabase) {
+      throw new Error(MISSING_SUPABASE_ENV_MESSAGE);
+    }
+
     await signInAnonymously();
 
     const {
@@ -84,7 +97,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   signOut: async (): Promise<void> => {
-    await authSignOut();
+    if (supabase) {
+      await authSignOut();
+    }
     set({ status: 'unauthenticated', authUserId: null, studentProfile: null });
   },
 }));

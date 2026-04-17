@@ -1,34 +1,32 @@
 /**
  * Sound Safari — Match letters to their sounds.
  *
- * Format: a letter is shown, 4 sound descriptions are offered as options.
- * One round per letter in the alphabet (Α–Μ, 12 rounds).
+ * Format: a letter is shown, four sound descriptions are offered as options.
+ * One round per letter returned by `getLettersForIsland`.
  * Stars: ≥80% correct → 3, ≥55% → 2, else 1.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
-import { GREEK_LETTERS } from '../../data/alphabet/letterData';
-import type { GreekLetter } from '../../data/alphabet/letterData';
-import { getLevelsForIsland } from '../../data/islands/levelConfig';
-import type { IslandId } from '../../data/islands/islandConfig';
 import {
-  saveGameProgress,
-  loadGameProgress,
-} from '../../shared/services/gameProgressCache';
+  GREEK_LETTERS,
+  getLettersForIsland,
+} from '../../data/alphabet/letterData';
+import type { GreekLetter } from '../../data/alphabet/letterData';
+import type { IslandId } from '../../data/islands/islandConfig';
 import { buildShuffledOptions } from '../../shared/utils/quizHelpers';
-import { finishGame } from '../../shared/utils/finishGame';
-import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
-import { useAuthStore } from '../../shared/stores/authStore';
+import {
+  useGameSession,
+  useResumeGame,
+} from '../games/shared/useGameSession';
+import { GameShell } from '../games/shared/GameShell';
 import { colors } from '../../app/theme/colors';
 import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
@@ -50,65 +48,63 @@ export function SoundSafariScreen({
   navigation,
 }: Props): React.JSX.Element {
   const { islandId, levelId } = route.params;
-  const levelName =
-    getLevelsForIsland(islandId as IslandId).find((l) => l.id === levelId)
-      ?.name ?? levelId;
-  const studentProfile = useAuthStore((s) => s.studentProfile);
-  const profileId = studentProfile?.id ?? 'guest';
+
+  const session = useGameSession({
+    game: 'soundSafari',
+    islandId,
+    levelId,
+    navigation,
+  });
 
   const [roundIndex, setRoundIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [answerState, setAnswerState] = useState<AnswerState>('pending');
   const [chosenId, setChosenId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  const total = GREEK_LETTERS.length;
-  const letter = GREEK_LETTERS[roundIndex];
+  const islandLetters = useMemo(
+    () => getLettersForIsland(islandId as IslandId),
+    [islandId],
+  );
+  const total = islandLetters.length;
+  const letter = islandLetters[roundIndex] ?? islandLetters[0];
   const options = useMemo(
     () => buildShuffledOptions(GREEK_LETTERS, letter, 3),
     [letter],
   );
 
-  // Restore saved progress on mount
-  useEffect(() => {
-    loadGameProgress('soundSafari', levelId, profileId)
-      .then((saved) => {
-        if (saved) {
-          setRoundIndex(saved.roundIndex);
-          setCorrect(saved.correct);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [levelId, profileId]);
+  useResumeGame(
+    session,
+    (saved) => saved.roundIndex > 0,
+    (saved) => {
+      setRoundIndex(saved.roundIndex);
+      setCorrect(saved.correct);
+    },
+  );
 
   const handleSave = useCallback((): void => {
-    saveGameProgress('soundSafari', levelId, profileId, {
-      roundIndex,
-      correct,
-    }).catch(() => {});
-  }, [roundIndex, correct, levelId, profileId]);
+    session.save({ roundIndex, correct }).catch(() => {});
+  }, [session, roundIndex, correct]);
 
-  const handleExit = useExitConfirmation(navigation, handleSave);
+  const handleExit = useMemo(
+    () => session.makeExitHandler(handleSave),
+    [session, handleSave],
+  );
 
   const handleFinishGame = useCallback(
     async (finalCorrect: number): Promise<void> => {
       const stars = correctionsToStars(finalCorrect, total);
       const score = Math.round((finalCorrect / total) * 100);
-      await finishGame({
-        game: 'soundSafari',
-        levelId,
-        profileId,
-        studentProfileId: studentProfile?.id,
-        islandId,
+      await session.finish({
         stars,
         bestScore: score,
-        setSaving,
-        onComplete: () =>
-          navigation.replace('Results', { stars, levelName, islandId, levelId }),
+        scoreDetails: {
+          score,
+          accuracy: finalCorrect / total,
+          attempts: total,
+        },
       });
     },
-    [studentProfile, islandId, levelId, levelName, profileId, total, navigation],
+    [session, total],
   );
 
   function handleChoice(chosen: GreekLetter): void {
@@ -143,46 +139,27 @@ export function SoundSafariScreen({
     return gameStyles.option;
   }
 
-  if (loading || saving) {
-    return (
-      <SafeAreaView style={gameStyles.container}>
-        <ActivityIndicator
-          size="large"
-          color={colors.oceanBlue}
-          style={gameStyles.loader}
-        />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
-      <View style={gameStyles.header}>
-        <View style={gameStyles.headerRow}>
-          <Pressable
-            style={gameStyles.exitBtn}
-            onPress={handleExit}
-            accessibilityRole="button"
-            accessibilityLabel="Save and exit"
-          >
-            <Text style={gameStyles.exitText}>✕</Text>
-          </Pressable>
-          <Text style={gameStyles.title}>Sound Safari 🔊</Text>
-          <View style={gameStyles.exitBtn} />
-        </View>
-        <Text style={styles.score}>
-          {correct} / {roundIndex} correct
-        </Text>
-        <View style={[gameStyles.progressTrack, styles.progressTrackMargin]}>
-          <View
-            style={[
-              gameStyles.progressFill,
-              { width: `${((roundIndex + 1) / total) * 100}%` },
-            ]}
-          />
-        </View>
-      </View>
-
+    <GameShell
+      title="Sound Safari 🔊"
+      onExit={handleExit}
+      loading={session.loading}
+      saving={session.saving}
+      headerExtras={
+        <>
+          <Text style={styles.score}>
+            {correct} / {roundIndex} correct
+          </Text>
+          <View style={[gameStyles.progressTrack, styles.progressTrackMargin]}>
+            <View
+              style={[
+                gameStyles.progressFill,
+                { width: `${((roundIndex + 1) / total) * 100}%` },
+              ]}
+            />
+          </View>
+        </>
+      }>
       <View style={styles.body}>
         <Text style={styles.prompt}>What sound does this letter make?</Text>
         <View style={[gameStyles.charCard, styles.charCardSize]}>
@@ -202,8 +179,7 @@ export function SoundSafariScreen({
               onPress={() => handleChoice(opt)}
               disabled={answerState !== 'pending'}
               accessibilityRole="button"
-              accessibilityLabel={opt.sound}
-            >
+              accessibilityLabel={opt.sound}>
               <Text style={styles.optionText}>{opt.sound}</Text>
               <Text style={styles.optionLetter}>{opt.char}</Text>
             </Pressable>
@@ -216,7 +192,7 @@ export function SoundSafariScreen({
           </Text>
         )}
       </View>
-    </SafeAreaView>
+    </GameShell>
   );
 }
 

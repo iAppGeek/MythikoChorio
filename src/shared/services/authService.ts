@@ -1,15 +1,10 @@
-import { supabase } from './supabaseClient';
-import type { AppRole } from '../models/Staff';
+import { requireSupabase } from './supabaseClient';
 import type { StudentProfile } from '../models/Student';
-
-export type ResolvedUser = {
-  role: AppRole | 'unregistered';
-  app_user_id: string | null;
-};
 
 // ─── Guest flow ───────────────────────────────────────────────────────────────
 
 export async function signInAnonymously(): Promise<void> {
+  const supabase = requireSupabase();
   const { error } = await supabase.auth.signInAnonymously();
   if (error) {
     throw new Error(`Anonymous sign-in failed: ${error.message}`);
@@ -21,6 +16,7 @@ export async function createGuestProfile(
   age: number,
   authUserId: string,
 ): Promise<StudentProfile> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('student_profiles')
     .insert({
@@ -44,6 +40,7 @@ export async function createGuestProfile(
 export async function getStudentProfile(
   authUserId: string,
 ): Promise<StudentProfile | null> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('student_profiles')
     .select('*')
@@ -63,6 +60,7 @@ export async function getStudentProfile(
 // ─── Session ──────────────────────────────────────────────────────────────────
 
 export async function signOut(): Promise<void> {
+  const supabase = requireSupabase();
   const { error } = await supabase.auth.signOut();
   if (error) {
     throw new Error(`Sign-out failed: ${error.message}`);
@@ -72,48 +70,6 @@ export async function signOut(): Promise<void> {
 // ─── SSO (reserved for future implementation) ─────────────────────────────────
 // signInWithMicrosoft() and resolveUserRole() will be added here when SSO is
 // re-enabled. The guest profile upgrade path (link_guest_to_player /
-// merge_guest_into_player) is already in the database schema.
-
-export async function resolveUserRole(
-  authUserId: string,
-): Promise<ResolvedUser> {
-  const { data, error } = await supabase.rpc('resolve_user_role', {
-    p_auth_user_id: authUserId,
-  });
-
-  if (error) {
-    throw new Error(`Failed to resolve user role: ${error.message}`);
-  }
-
-  if (!data || data.length === 0) {
-    return { role: 'unregistered', app_user_id: null };
-  }
-
-  const row = data[0];
-  return {
-    role: row.role as AppRole | 'unregistered',
-    app_user_id: row.app_user_id ?? null,
-  };
-}
-
-export async function linkToExternalSystem(
-  appUserId: string,
-  systemName: string,
-  externalId: string,
-  linkedBy: string,
-  notes?: string,
-): Promise<'linked' | 'updated' | 'conflict'> {
-  const { data, error } = await supabase.rpc('link_to_external_system', {
-    p_app_user_id: appUserId,
-    p_system_name: systemName,
-    p_external_id: externalId,
-    p_linked_by: linkedBy,
-    p_notes: notes,
-  });
-
-  if (error) {
-    throw new Error(`Failed to link external system: ${error.message}`);
-  }
-
-  return data as 'linked' | 'updated' | 'conflict';
-}
+// merge_guest_into_player) is already in the database schema. Starter
+// implementations of resolveUserRole() and linkToExternalSystem() live in
+// plans/phase-3-staff-dashboards.md for easy restoration.

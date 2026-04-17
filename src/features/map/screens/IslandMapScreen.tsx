@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,14 @@ import Animated, {
   withSpring,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../../app/navigationTypes';
 import { useAuthStore } from '../../../shared/stores/authStore';
 import { ISLANDS, getUnlockedIslands } from '../../../data/islands/islandConfig';
-import type { Island } from '../../../data/islands/islandConfig';
+import type { Island, IslandId } from '../../../data/islands/islandConfig';
+import { isIslandCleared } from '../../../data/islands/levelConfig';
+import { getAllProgress } from '../../../shared/services/progressService';
 import { colors } from '../../../app/theme/colors';
 import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
@@ -101,11 +104,53 @@ function IslandMarker({
 export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
   const { width } = useWindowDimensions();
   const studentProfile = useAuthStore((s) => s.studentProfile);
-
-  const currentIsland = studentProfile?.current_island ?? 'alpha';
-  const unlockedIslands = getUnlockedIslands(
-    currentIsland as Parameters<typeof getUnlockedIslands>[0],
+  const [clearedIslands, setClearedIslands] = useState<Set<IslandId>>(
+    () => new Set(),
   );
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!studentProfile) return;
+      let cancelled = false;
+      getAllProgress(studentProfile.id)
+        .then((rows) => {
+          if (cancelled) return;
+          const starsByIsland = new Map<IslandId, Map<string, number>>();
+          for (const row of rows) {
+            const islandId = row.island_id as IslandId;
+            if (!starsByIsland.has(islandId)) {
+              starsByIsland.set(islandId, new Map());
+            }
+            starsByIsland.get(islandId)!.set(row.level_id, row.stars_earned);
+          }
+          const cleared = new Set<IslandId>();
+          for (const island of ISLANDS) {
+            const stars = starsByIsland.get(island.id) ?? new Map();
+            if (isIslandCleared(island.id, stars)) {
+              cleared.add(island.id);
+            }
+          }
+          setClearedIslands(cleared);
+          setProgressError(null);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          console.warn('[IslandMapScreen] getAllProgress failed', err);
+          setProgressError(
+            err instanceof Error ? err.message : 'Unable to load progress',
+          );
+        });
+      return (): void => {
+        cancelled = true;
+      };
+      // reloadTick is a manual bump used by the retry banner to force a re-fetch.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studentProfile, reloadTick]),
+  );
+
+  const unlockedIslands = getUnlockedIslands(clearedIslands);
 
   function handleIslandPress(islandId: string): void {
     navigation.navigate('IslandLevelSelect', { islandId });
@@ -136,6 +181,21 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
         </View>
       </View>
 
+      {progressError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText} numberOfLines={2}>
+            Couldn't load progress. {progressError}
+          </Text>
+          <Pressable
+            onPress={() => setReloadTick((t) => t + 1)}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading progress"
+            style={styles.errorRetry}>
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* ── Map ── */}
       <ScrollView
         style={styles.mapScroll}
@@ -155,32 +215,8 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
         ))}
       </ScrollView>
 
-      {/* ── Bottom nav ── */}
-      <SafeAreaView edges={['bottom']} style={styles.bottomNav}>
-        <Pressable
-          style={styles.navItem}
-          accessibilityRole="button"
-          accessibilityLabel="Jukebox">
-          <Text style={styles.navEmoji}>🎵</Text>
-          <Text style={styles.navLabel}>Jukebox</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.navItem}
-          accessibilityRole="button"
-          accessibilityLabel="Backpack">
-          <Text style={styles.navEmoji}>🎒</Text>
-          <Text style={styles.navLabel}>Backpack</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.navItem}
-          accessibilityRole="button"
-          accessibilityLabel="Settings">
-          <Text style={styles.navEmoji}>⚙️</Text>
-          <Text style={styles.navLabel}>Settings</Text>
-        </Pressable>
-      </SafeAreaView>
+      {/* Bottom navigation (Jukebox / Backpack / Settings) lands in Phase 4+.
+          Removed the placeholder Pressables that pretended to be interactive. */}
     </SafeAreaView>
   );
 }
@@ -306,25 +342,33 @@ const styles = StyleSheet.create({
     color: colors.lockedLabel,
   },
 
-  // ── Bottom nav
-  bottomNav: {
+  // ── Error banner
+  errorBanner: {
     flexDirection: 'row',
-    backgroundColor: colors.cloudWhite,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  navItem: {
-    flex: 1,
     alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.screen,
     paddingVertical: spacing.sm,
-    gap: 2,
+    backgroundColor: colors.errorBg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.error,
   },
-  navEmoji: {
-    fontSize: 24,
-  },
-  navLabel: {
+  errorText: {
+    flex: 1,
     fontSize: typography.fontSize.caption,
-    color: colors.oliveGreen,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.error,
+  },
+  errorRetry: {
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.cloudWhite,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  errorRetryText: {
+    fontSize: typography.fontSize.caption,
+    color: colors.error,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../../app/navigationTypes';
+import { GAME_SCREEN } from '../../../data/islands/levelConfig';
 import { colors } from '../../../app/theme/colors';
 import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
@@ -41,11 +42,14 @@ function AnimatedStar({
 }
 
 export function ResultsScreen({ route, navigation }: Props): React.JSX.Element {
-  const { stars, levelName, islandId } = route.params;
+  const { stars, levelName, islandId, levelId, gameType } = route.params;
   const praise = PRAISE[stars - 1];
 
   function handleReplay(): void {
-    navigation.pop(2);
+    // Replace the current Results entry with a fresh game screen so the back
+    // stack stays [IslandLevelSelect, Game] regardless of whether the user
+    // came here from a single play or a repeated Replay chain.
+    navigation.replace(GAME_SCREEN[gameType], { islandId, levelId });
   }
 
   function handleContinue(): void {
