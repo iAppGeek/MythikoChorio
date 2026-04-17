@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
-import { GREEK_LETTERS } from '../../data/alphabet/letterData';
+import { GREEK_LETTERS, getLettersForIsland } from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
@@ -108,8 +108,11 @@ export function MemoryMatchScreen({
 
   // Generate a stable new deck order (only used when not resuming)
   const freshLetters = useMemo(
-    () => [...GREEK_LETTERS].sort(() => Math.random() - 0.5).slice(0, PAIRS),
-    [],
+    () =>
+      [...getLettersForIsland(islandId)]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, PAIRS),
+    [islandId],
   );
   const freshDeckIds = useMemo(
     () => newShuffledDeckIds(freshLetters),

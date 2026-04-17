@@ -18,6 +18,21 @@ export async function getIslandProgress(
   return data ?? [];
 }
 
+export async function getAllProgress(
+  studentProfileId: string,
+): Promise<IslandProgress[]> {
+  const { data, error } = await supabase
+    .from('island_progress')
+    .select('*')
+    .eq('student_profile_id', studentProfileId);
+
+  if (error) {
+    throw new Error(`Failed to fetch progress: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
 export async function upsertLevelProgress(params: {
   studentProfileId: string;
   islandId: string;

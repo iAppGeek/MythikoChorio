@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
-import { GREEK_LETTERS } from '../../data/alphabet/letterData';
+import { getLettersForIsland } from '../../data/alphabet/letterData';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
 import { MeetTheLetterStep } from './steps/MeetTheLetterStep';
@@ -31,6 +31,8 @@ type StepType = 'meet' | 'watch' | 'trace' | 'free' | 'challenge';
 const STEPS_BY_LEVEL: Record<string, StepType[]> = {
   alpha_meet_letters: ['meet', 'watch', 'challenge'],
   alpha_trace_letters: ['meet', 'watch', 'trace', 'free', 'challenge'],
+  beta_meet_letters: ['meet', 'watch', 'challenge'],
+  beta_trace_letters: ['meet', 'watch', 'trace', 'free', 'challenge'],
 };
 
 const DEFAULT_STEPS: StepType[] = ['meet', 'watch', 'challenge'];
@@ -40,6 +42,7 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
   const steps = STEPS_BY_LEVEL[levelId] ?? DEFAULT_STEPS;
   const levelName =
     getLevelsForIsland(islandId as IslandId).find((l) => l.id === levelId)?.name ?? levelId;
+  const letters = useMemo(() => getLettersForIsland(islandId), [islandId]);
 
   const studentProfile = useAuthStore((s) => s.studentProfile);
   const profileId = studentProfile?.id ?? 'guest';
@@ -106,7 +109,7 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
 
   const handleExit = useExitConfirmation(navigation, handleSave);
 
-  const letter = GREEK_LETTERS[letterIndex];
+  const letter = letters[letterIndex];
   const currentStep = steps[stepIndex];
 
   const finishLevel = useCallback(async (): Promise<void> => {
@@ -149,7 +152,7 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
         letterScoresRef.current = [];
 
         const nextLetterIndex = letterIndex + 1;
-        if (nextLetterIndex >= GREEK_LETTERS.length) {
+        if (nextLetterIndex >= letters.length) {
           finishLevel().catch(() => {});
         } else {
           setLetterIndex(nextLetterIndex);
@@ -172,7 +175,7 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
     );
   }
 
-  const progressText = `${letter.char} · ${letterIndex + 1} / ${GREEK_LETTERS.length}`;
+  const progressText = `${letter.char} · ${letterIndex + 1} / ${letters.length}`;
 
   return (
     <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
@@ -193,7 +196,7 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
           <View
             style={[
               gameStyles.progressFill,
-              { width: `${((letterIndex + 1) / GREEK_LETTERS.length) * 100}%` },
+              { width: `${((letterIndex + 1) / letters.length) * 100}%` },
             ]}
           />
         </View>

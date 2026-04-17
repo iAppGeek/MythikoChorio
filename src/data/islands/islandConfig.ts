@@ -116,10 +116,19 @@ export const ISLANDS: Island[] = [
 ];
 
 /**
- * Returns the set of island IDs that are unlocked for a given current island.
- * Phase 1: only Alpha Island is ever unlocked. Expand this when multi-island
- * progression is implemented.
+ * Returns the set of island IDs that are unlocked given the set of islands
+ * the player has "cleared" (all levels have at least 1 star). An island
+ * unlocks when its `unlockAfter` island is cleared; islands with
+ * `unlockAfter: null` are always unlocked.
  */
-export function getUnlockedIslands(_currentIsland: IslandId): Set<IslandId> {
-  return new Set<IslandId>(['alpha']);
+export function getUnlockedIslands(
+  clearedIslands: Set<IslandId>,
+): Set<IslandId> {
+  const unlocked = new Set<IslandId>();
+  for (const island of ISLANDS) {
+    if (island.unlockAfter === null || clearedIslands.has(island.unlockAfter)) {
+      unlocked.add(island.id);
+    }
+  }
+  return unlocked;
 }

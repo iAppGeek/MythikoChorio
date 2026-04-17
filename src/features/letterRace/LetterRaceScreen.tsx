@@ -12,7 +12,11 @@ import { Canvas, Path } from '@shopify/react-native-skia';
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
-import { GREEK_LETTERS, CANVAS_SIZE } from '../../data/alphabet/letterData';
+import {
+  GREEK_LETTERS,
+  CANVAS_SIZE,
+  getLettersForIsland,
+} from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
@@ -47,8 +51,11 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
   const profileId = studentProfile?.id ?? 'guest';
 
   const freshLetterIds = useMemo(
-    () => [...GREEK_LETTERS].sort(() => Math.random() - 0.5).map((l) => l.id),
-    [],
+    () =>
+      [...getLettersForIsland(islandId)]
+        .sort(() => Math.random() - 0.5)
+        .map((l) => l.id),
+    [islandId],
   );
 
   const [letterIds, setLetterIds] = useState<string[]>(freshLetterIds);

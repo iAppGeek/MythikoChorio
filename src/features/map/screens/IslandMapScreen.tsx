@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,14 @@ import Animated, {
   withSpring,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../../app/navigationTypes';
 import { useAuthStore } from '../../../shared/stores/authStore';
 import { ISLANDS, getUnlockedIslands } from '../../../data/islands/islandConfig';
-import type { Island } from '../../../data/islands/islandConfig';
+import type { Island, IslandId } from '../../../data/islands/islandConfig';
+import { isIslandCleared } from '../../../data/islands/levelConfig';
+import { getAllProgress } from '../../../shared/services/progressService';
 import { colors } from '../../../app/theme/colors';
 import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
@@ -101,11 +104,39 @@ function IslandMarker({
 export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
   const { width } = useWindowDimensions();
   const studentProfile = useAuthStore((s) => s.studentProfile);
-
-  const currentIsland = studentProfile?.current_island ?? 'alpha';
-  const unlockedIslands = getUnlockedIslands(
-    currentIsland as Parameters<typeof getUnlockedIslands>[0],
+  const [clearedIslands, setClearedIslands] = useState<Set<IslandId>>(
+    () => new Set(),
   );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!studentProfile) return;
+      getAllProgress(studentProfile.id)
+        .then((rows) => {
+          const starsByIsland = new Map<IslandId, Map<string, number>>();
+          for (const row of rows) {
+            const islandId = row.island_id as IslandId;
+            if (!starsByIsland.has(islandId)) {
+              starsByIsland.set(islandId, new Map());
+            }
+            starsByIsland.get(islandId)!.set(row.level_id, row.stars_earned);
+          }
+          const cleared = new Set<IslandId>();
+          for (const island of ISLANDS) {
+            const stars = starsByIsland.get(island.id) ?? new Map();
+            if (isIslandCleared(island.id, stars)) {
+              cleared.add(island.id);
+            }
+          }
+          setClearedIslands(cleared);
+        })
+        .catch(() => {
+          // Non-fatal: leave cleared set empty
+        });
+    }, [studentProfile]),
+  );
+
+  const unlockedIslands = getUnlockedIslands(clearedIslands);
 
   function handleIslandPress(islandId: string): void {
     navigation.navigate('IslandLevelSelect', { islandId });

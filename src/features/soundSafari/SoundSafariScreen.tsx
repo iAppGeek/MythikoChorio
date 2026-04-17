@@ -17,7 +17,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../app/navigationTypes';
-import { GREEK_LETTERS } from '../../data/alphabet/letterData';
+import { GREEK_LETTERS, getLettersForIsland } from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
 import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
@@ -63,8 +63,9 @@ export function SoundSafariScreen({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const total = GREEK_LETTERS.length;
-  const letter = GREEK_LETTERS[roundIndex];
+  const islandLetters = useMemo(() => getLettersForIsland(islandId), [islandId]);
+  const total = islandLetters.length;
+  const letter = islandLetters[roundIndex] ?? islandLetters[0];
   const options = useMemo(
     () => buildShuffledOptions(GREEK_LETTERS, letter, 3),
     [letter],
