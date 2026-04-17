@@ -121,6 +121,15 @@ export function useGameSession<G extends Game>({
         scoreDetails,
         setSaving,
         onPersistError: notifyPersistError,
+        onPersistOutcome: ({ hadPersistFailure }) => {
+          if (hadPersistFailure) {
+            Alert.alert(
+              'Could not save online',
+              'Your result is shown, but progress may not have synced. Check your connection and try again later.',
+              [{ text: 'OK' }],
+            );
+          }
+        },
         onComplete: () =>
           navigation.replace('Results', {
             stars,
@@ -221,7 +230,9 @@ export function useResumeGame<G extends Game>(
             {
               text: 'Start Fresh',
               onPress: (): void => {
-                void clear().finally(() => setLoading(false));
+                clear()
+                  .catch(() => {})
+                  .finally(() => setLoading(false));
               },
             },
             {

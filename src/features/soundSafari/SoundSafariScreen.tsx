@@ -82,7 +82,7 @@ export function SoundSafariScreen({
   );
 
   const handleSave = useCallback((): void => {
-    void session.save({ roundIndex, correct });
+    session.save({ roundIndex, correct }).catch(() => {});
   }, [session, roundIndex, correct]);
 
   const handleExit = useMemo(

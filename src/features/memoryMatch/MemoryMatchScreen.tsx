@@ -141,11 +141,13 @@ export function MemoryMatchScreen({
       currentFlips: number,
       currentDeckIds: string[],
     ): void => {
-      void session.save({
-        deckIds: currentDeckIds,
-        matched: currentMatched,
-        flips: currentFlips,
-      });
+      session
+        .save({
+          deckIds: currentDeckIds,
+          matched: currentMatched,
+          flips: currentFlips,
+        })
+        .catch(() => {});
     },
     [session],
   );

@@ -84,7 +84,7 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
   );
 
   const handleSave = useCallback((): void => {
-    void session.save({ letterIds, roundIndex, scores });
+    session.save({ letterIds, roundIndex, scores }).catch(() => {});
   }, [session, letterIds, roundIndex, scores]);
 
   const handleExit = useMemo(
@@ -147,11 +147,13 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
       setRoundIndex(nextIndex);
       setPhase('drawing');
       reset();
-      void session.save({
-        letterIds,
-        roundIndex: nextIndex,
-        scores: newScores,
-      });
+      session
+        .save({
+          letterIds,
+          roundIndex: nextIndex,
+          scores: newScores,
+        })
+        .catch(() => {});
     }
   }
 

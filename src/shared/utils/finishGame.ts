@@ -3,6 +3,14 @@ import { upsertLevelProgress } from '../services/progressService';
 import { saveGameScore } from '../services/scoreService';
 import type { CacheMap } from '../services/gameProgressCache';
 
+/** Clamp to DB-safe 0–100 integer for `game_scores.score`. */
+export function clampScore0To100(n: number): number {
+  if (!Number.isFinite(n)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
+
 export type GameScoreDetails = {
   /** Raw score achieved on a 0–100 scale (matches the DB `score` column). */
   score: number;
@@ -34,6 +42,12 @@ type FinishGameParams = {
    * completes — but they should surface somewhere (toast, logger, etc).
    */
   onPersistError?: (err: unknown) => void;
+  /**
+   * Called once after server writes (before navigation). Use
+   * `hadPersistFailure` to show a non-blocking hint if the success screen
+   * might not reflect saved progress.
+   */
+  onPersistOutcome?: (summary: { hadPersistFailure: boolean }) => void;
 };
 
 /**
@@ -55,9 +69,12 @@ export async function finishGame({
   setSaving,
   onComplete,
   onPersistError,
+  onPersistOutcome,
 }: FinishGameParams): Promise<void> {
   setSaving(true);
   await clearGameProgress(game, levelId, profileId);
+
+  let hadPersistFailure = false;
 
   if (studentProfileId) {
     try {
@@ -69,6 +86,7 @@ export async function finishGame({
         bestScore,
       });
     } catch (err) {
+      hadPersistFailure = true;
       console.warn('[finishGame] upsertLevelProgress failed', err);
       onPersistError?.(err);
     }
@@ -80,7 +98,7 @@ export async function finishGame({
           island_id: islandId,
           level_id: levelId,
           game_type: game,
-          score: scoreDetails.score,
+          score: clampScore0To100(scoreDetails.score),
           accuracy: scoreDetails.accuracy ?? null,
           time_spent_secs: scoreDetails.timeSpentSecs ?? null,
           attempts: scoreDetails.attempts ?? null,
@@ -88,12 +106,14 @@ export async function finishGame({
           completed_at: new Date().toISOString(),
         });
       } catch (err) {
+        hadPersistFailure = true;
         console.warn('[finishGame] saveGameScore failed', err);
         onPersistError?.(err);
       }
     }
   }
 
+  onPersistOutcome?.({ hadPersistFailure });
   setSaving(false);
   onComplete();
 }

@@ -66,12 +66,14 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
 
   const persistProgress = useCallback(
     (li: number, si: number): void => {
-      void session.save({
-        letterIndex: li,
-        stepIndex: si,
-        scores: scoresRef.current,
-        letterScores: letterScoresRef.current,
-      });
+      session
+        .save({
+          letterIndex: li,
+          stepIndex: si,
+          scores: scoresRef.current,
+          letterScores: letterScoresRef.current,
+        })
+        .catch(() => {});
     },
     [session],
   );

@@ -57,6 +57,31 @@ describe('progressService.upsertLevelProgress', () => {
       }),
     ).rejects.toThrow('Failed to save level progress: boom');
   });
+
+  /** Keeps JS payload aligned with `CREATE FUNCTION upsert_level_progress(...)` in schema.sql */
+  it('RPC payload keys match upsert_level_progress SQL parameter names', async () => {
+    mockRpc.mockResolvedValueOnce({ error: null });
+    await upsertLevelProgress({
+      studentProfileId: 'uuid-here',
+      islandId: 'alpha',
+      levelId: 'lvl1',
+      starsEarned: 3,
+      bestScore: 99,
+    });
+    const [, payload] = mockRpc.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(Object.keys(payload).sort()).toEqual(
+      [
+        'p_best_score',
+        'p_island_id',
+        'p_level_id',
+        'p_stars_earned',
+        'p_student_profile_id',
+      ].sort(),
+    );
+  });
 });
 
 describe('progressService.getIslandProgress / getAllProgress', () => {

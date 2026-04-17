@@ -8,7 +8,7 @@ jest.mock('../src/shared/services/scoreService', () => ({
   saveGameScore: jest.fn(),
 }));
 
-import { finishGame } from '../src/shared/utils/finishGame';
+import { finishGame, clampScore0To100 } from '../src/shared/utils/finishGame';
 import { clearGameProgress } from '../src/shared/services/gameProgressCache';
 import { upsertLevelProgress } from '../src/shared/services/progressService';
 import { saveGameScore } from '../src/shared/services/scoreService';
@@ -138,5 +138,36 @@ describe('finishGame', () => {
     expect(upsertMock).toHaveBeenCalled();
     expect(onPersistError).toHaveBeenCalledWith(err);
     expect(params.onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onPersistOutcome with hadPersistFailure when upsert fails', async () => {
+    upsertMock.mockRejectedValueOnce(new Error('x'));
+    const onPersistOutcome = jest.fn();
+    await finishGame(baseParams({ onPersistOutcome }));
+    expect(onPersistOutcome).toHaveBeenCalledWith({ hadPersistFailure: true });
+  });
+
+  it('calls onPersistOutcome with hadPersistFailure false on full success', async () => {
+    const onPersistOutcome = jest.fn();
+    await finishGame(baseParams({ onPersistOutcome, scoreDetails: { score: 10 } }));
+    expect(onPersistOutcome).toHaveBeenCalledWith({ hadPersistFailure: false });
+  });
+
+  it('clamps game_scores score to 0–100 before insert', async () => {
+    await finishGame(
+      baseParams({ scoreDetails: { score: 150 } }),
+    );
+    expect(saveMock).toHaveBeenCalledWith(
+      expect.objectContaining({ score: 100 }),
+    );
+  });
+});
+
+describe('clampScore0To100', () => {
+  it('clamps to range and rounds', () => {
+    expect(clampScore0To100(150)).toBe(100);
+    expect(clampScore0To100(-1)).toBe(0);
+    expect(clampScore0To100(49.4)).toBe(49);
+    expect(clampScore0To100(NaN)).toBe(0);
   });
 });
