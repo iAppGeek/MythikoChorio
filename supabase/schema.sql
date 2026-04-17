@@ -300,6 +300,44 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- Atomic level-progress upsert.
+--   * Inserts a row with times_played = 1 on first play of a level.
+--   * On subsequent plays:
+--       - stars_earned keeps the best result
+--       - best_score keeps the best result
+--       - times_played increments by 1
+--       - completed_at is stamped the first time stars_earned >= 1
+--
+-- Called by the app at the end of every game so we get an accurate
+-- play-count instead of relying on the DEFAULT 1.
+CREATE OR REPLACE FUNCTION upsert_level_progress(
+  p_student_profile_id uuid,
+  p_island_id          text,
+  p_level_id           text,
+  p_stars_earned       integer,
+  p_best_score         integer
+)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO island_progress (
+    student_profile_id, island_id, level_id,
+    stars_earned, best_score, times_played, completed_at
+  )
+  VALUES (
+    p_student_profile_id, p_island_id, p_level_id,
+    p_stars_earned, p_best_score, 1,
+    CASE WHEN p_stars_earned > 0 THEN NOW() ELSE NULL END
+  )
+  ON CONFLICT (student_profile_id, island_id, level_id) DO UPDATE
+    SET stars_earned = GREATEST(island_progress.stars_earned, EXCLUDED.stars_earned),
+        best_score   = GREATEST(COALESCE(island_progress.best_score, 0), COALESCE(EXCLUDED.best_score, 0)),
+        times_played = island_progress.times_played + 1,
+        completed_at = COALESCE(island_progress.completed_at,
+                                CASE WHEN EXCLUDED.stars_earned > 0 THEN NOW() ELSE NULL END);
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Conflict resolution: moves all game data from a guest profile onto an existing
 -- authenticated player profile, then deletes the guest profile.
 CREATE FUNCTION merge_guest_into_player(

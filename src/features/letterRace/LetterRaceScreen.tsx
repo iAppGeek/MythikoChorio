@@ -6,8 +6,7 @@
  * Stars: avg accuracy ≥80% → 3, ≥55% → 2, else 1.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, Alert, StyleSheet, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Canvas, Path } from '@shopify/react-native-skia';
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -18,18 +17,15 @@ import {
   getLettersForIsland,
 } from '../../data/alphabet/letterData';
 import type { GreekLetter } from '../../data/alphabet/letterData';
-import { getLevelsForIsland } from '../../data/islands/levelConfig';
 import type { IslandId } from '../../data/islands/islandConfig';
-import { useTracingCanvas } from '../letterLab/hooks/useTracingCanvas';
-import { calculateTraceAccuracy, scoreToStars } from '../letterLab/utils/traceAccuracy';
-import {
-  saveGameProgress,
-  loadGameProgress,
-} from '../../shared/services/gameProgressCache';
+import { useTracingCanvas } from '../../shared/hooks/useTracingCanvas';
+import { calculateTraceAccuracy, scoreToStars } from '../../shared/utils/traceAccuracy';
 import { buildPathFromStrokes } from '../../shared/utils/skiaPathBuilder';
-import { finishGame } from '../../shared/utils/finishGame';
-import { useExitConfirmation } from '../../shared/hooks/useExitConfirmation';
-import { useAuthStore } from '../../shared/stores/authStore';
+import {
+  useGameSession,
+  useResumeGame,
+} from '../games/shared/useGameSession';
+import { GameShell } from '../games/shared/GameShell';
 import { colors } from '../../app/theme/colors';
 import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
@@ -45,14 +41,17 @@ const LETTER_BY_ID = new Map<string, GreekLetter>(GREEK_LETTERS.map((l) => [l.id
 
 export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Element {
   const { islandId, levelId } = route.params;
-  const levelName =
-    getLevelsForIsland(islandId as IslandId).find((l) => l.id === levelId)?.name ?? levelId;
-  const studentProfile = useAuthStore((s) => s.studentProfile);
-  const profileId = studentProfile?.id ?? 'guest';
+
+  const session = useGameSession({
+    game: 'letterRace',
+    islandId,
+    levelId,
+    navigation,
+  });
 
   const freshLetterIds = useMemo(
     () =>
-      [...getLettersForIsland(islandId)]
+      [...getLettersForIsland(islandId as IslandId)]
         .sort(() => Math.random() - 0.5)
         .map((l) => l.id),
     [islandId],
@@ -64,8 +63,6 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
   const [timeLeft, setTimeLeft] = useState(TIME_PER_ROUND);
   const [roundAccuracy, setRoundAccuracy] = useState(0);
   const [scores, setScores] = useState<number[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const { strokes, gesture, reset, isEmpty } = useTracingCanvas();
 
@@ -76,52 +73,24 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
   const total = letters.length;
   const letter = letters[roundIndex] ?? GREEK_LETTERS[0];
 
-  // Restore or offer resume on mount
-  useEffect(() => {
-    loadGameProgress('letterRace', levelId, profileId).then((saved) => {
-      if (saved && saved.letterIds.length > 0 && saved.roundIndex > 0) {
-        Alert.alert(
-          'Resume game?',
-          'You have an unfinished game. Would you like to continue or start fresh?',
-          [
-            {
-              text: 'Start Fresh',
-              onPress: (): void => {
-                import('../../shared/services/gameProgressCache')
-                  .then(({ clearGameProgress }) =>
-                    clearGameProgress('letterRace', levelId, profileId),
-                  )
-                  .finally(() => setLoading(false));
-              },
-            },
-            {
-              text: 'Continue',
-              style: 'default',
-              onPress: (): void => {
-                setLetterIds(saved.letterIds);
-                setRoundIndex(saved.roundIndex);
-                setScores(saved.scores);
-                setLoading(false);
-              },
-            },
-          ],
-          { cancelable: false },
-        );
-      } else {
-        setLoading(false);
-      }
-    });
-  }, [levelId, profileId]);
+  useResumeGame(
+    session,
+    (saved) => saved.letterIds.length > 0 && saved.roundIndex > 0,
+    (saved) => {
+      setLetterIds(saved.letterIds);
+      setRoundIndex(saved.roundIndex);
+      setScores(saved.scores);
+    },
+  );
 
   const handleSave = useCallback((): void => {
-    saveGameProgress('letterRace', levelId, profileId, {
-      letterIds,
-      roundIndex,
-      scores,
-    }).catch(() => {});
-  }, [letterIds, roundIndex, scores, levelId, profileId]);
+    void session.save({ letterIds, roundIndex, scores });
+  }, [session, letterIds, roundIndex, scores]);
 
-  const handleExit = useExitConfirmation(navigation, handleSave);
+  const handleExit = useMemo(
+    () => session.makeExitHandler(handleSave),
+    [session, handleSave],
+  );
 
   const userPath = useMemo(() => buildPathFromStrokes(strokes), [strokes]);
 
@@ -155,20 +124,16 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
     async (allScores: number[]): Promise<void> => {
       const avg = Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
       const stars = scoreToStars(avg);
-      await finishGame({
-        game: 'letterRace',
-        levelId,
-        profileId,
-        studentProfileId: studentProfile?.id,
-        islandId,
+      await session.finish({
         stars,
         bestScore: avg,
-        setSaving,
-        onComplete: () =>
-          navigation.replace('Results', { stars, levelName, islandId, levelId }),
+        scoreDetails: {
+          score: avg,
+          accuracy: avg / 100,
+        },
       });
     },
-    [studentProfile, islandId, levelId, levelName, profileId, navigation],
+    [session],
   );
 
   function handleNext(): void {
@@ -182,48 +147,34 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
       setRoundIndex(nextIndex);
       setPhase('drawing');
       reset();
-      saveGameProgress('letterRace', levelId, profileId, {
+      void session.save({
         letterIds,
         roundIndex: nextIndex,
         scores: newScores,
-      }).catch(() => {});
+      });
     }
   }
 
   const resultEmoji = roundAccuracy >= 80 ? '🌟' : roundAccuracy >= 50 ? '👍' : '💪';
 
-  if (loading || saving) {
-    return (
-      <SafeAreaView style={gameStyles.container}>
-        <ActivityIndicator size="large" color={colors.oceanBlue} style={gameStyles.loader} />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={gameStyles.container} edges={['top', 'bottom']}>
-      <View style={gameStyles.header}>
-        <View style={gameStyles.headerRow}>
-          <Pressable
-            style={gameStyles.exitBtn}
-            onPress={handleExit}
-            accessibilityRole="button"
-            accessibilityLabel="Save and exit">
-            <Text style={gameStyles.exitText}>✕</Text>
-          </Pressable>
-          <Text style={gameStyles.title}>Letter Race 👑</Text>
-          <View style={gameStyles.exitBtn} />
-        </View>
-        <Text style={gameStyles.subtitle}>
-          {roundIndex + 1} / {total}
-        </Text>
-        <View style={gameStyles.progressTrack}>
-          <View
-            style={[gameStyles.progressFill, { width: `${((roundIndex + 1) / total) * 100}%` }]}
-          />
-        </View>
-      </View>
-
+    <GameShell
+      title="Letter Race 👑"
+      onExit={handleExit}
+      loading={session.loading}
+      saving={session.saving}
+      headerExtras={
+        <>
+          <Text style={gameStyles.subtitle}>
+            {roundIndex + 1} / {total}
+          </Text>
+          <View style={gameStyles.progressTrack}>
+            <View
+              style={[gameStyles.progressFill, { width: `${((roundIndex + 1) / total) * 100}%` }]}
+            />
+          </View>
+        </>
+      }>
       <View style={styles.body}>
         {phase === 'drawing' ? (
           <>
@@ -296,7 +247,7 @@ export function LetterRaceScreen({ route, navigation }: Props): React.JSX.Elemen
           </>
         )}
       </View>
-    </SafeAreaView>
+    </GameShell>
   );
 }
 

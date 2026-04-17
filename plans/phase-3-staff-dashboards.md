@@ -47,6 +47,104 @@ The dashboard query functions were created in Phase 0:
 >
 > Type all return values with TypeScript interfaces in `src/shared/models/`."
 
+### Phase-1 starter snippets
+
+These were shipped during Phase 1 but removed from `main` in the remediation
+cleanup because nothing consumed them. Restore them as `getAllPlayerProfiles`
+and `getAllGameScores` helpers in `dashboardService.ts` when the service is
+re-introduced:
+
+```ts
+// Returns all player profiles — accessible to teachers and admins.
+export async function getAllPlayerProfiles(): Promise<StudentProfile[]> {
+  const { data, error } = await supabase
+    .from('student_profiles')
+    .select('*')
+    .eq('is_guest', false)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch player profiles: ${error.message}`);
+  }
+
+  return (data ?? []) as StudentProfile[];
+}
+
+// Returns recent game scores across all players — accessible to teachers and admins.
+export async function getAllGameScores(limit = 200): Promise<GameScore[]> {
+  const { data, error } = await supabase
+    .from('game_scores')
+    .select('*')
+    .order('completed_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to fetch game scores: ${error.message}`);
+  }
+
+  return (data ?? []) as GameScore[];
+}
+```
+
+### Auth RPC helpers (also stashed here)
+
+`resolveUserRole` and `linkToExternalSystem` were removed from
+`src/shared/services/authService.ts` because the Phase-1 guest flow never
+calls them. Re-add them when SSO + admin-driven external links land:
+
+```ts
+import type { AppRole } from '../models/Staff';
+
+export type ResolvedUser = {
+  role: AppRole | 'unregistered';
+  app_user_id: string | null;
+};
+
+export async function resolveUserRole(
+  authUserId: string,
+): Promise<ResolvedUser> {
+  const { data, error } = await supabase.rpc('resolve_user_role', {
+    p_auth_user_id: authUserId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to resolve user role: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return { role: 'unregistered', app_user_id: null };
+  }
+
+  const row = data[0];
+  return {
+    role: row.role as AppRole | 'unregistered',
+    app_user_id: row.app_user_id ?? null,
+  };
+}
+
+export async function linkToExternalSystem(
+  appUserId: string,
+  systemName: string,
+  externalId: string,
+  linkedBy: string,
+  notes?: string,
+): Promise<'linked' | 'updated' | 'conflict'> {
+  const { data, error } = await supabase.rpc('link_to_external_system', {
+    p_app_user_id: appUserId,
+    p_system_name: systemName,
+    p_external_id: externalId,
+    p_linked_by: linkedBy,
+    p_notes: notes,
+  });
+
+  if (error) {
+    throw new Error(`Failed to link external system: ${error.message}`);
+  }
+
+  return data as 'linked' | 'updated' | 'conflict';
+}
+```
+
 ---
 
 ## 2. Teacher Dashboard

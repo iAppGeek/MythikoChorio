@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../../shared/stores/authStore';
+import { isSupabaseConfigured } from '../../../shared/services/supabaseClient';
 import { colors } from '../../../app/theme/colors';
 import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
@@ -77,6 +78,16 @@ export function WelcomeScreen(): React.JSX.Element {
           <Text style={styles.titleGreek}>Μυθικό Χωριό</Text>
           <Text style={styles.titleLatin}>Mythiko Chorio</Text>
           <Text style={styles.tagline}>Learn Greek through adventure</Text>
+
+          {!isSupabaseConfigured && (
+            <View style={styles.configBanner}>
+              <Text style={styles.configBannerText}>
+                Supabase is not configured. Copy .env.example to .env, add
+                SUPABASE_URL and SUPABASE_ANON_KEY from your project dashboard,
+                then rebuild the app (not just Metro refresh).
+              </Text>
+            </View>
+          )}
 
           {formState === 'idle' && (
             <View style={styles.buttonGroup}>
@@ -192,6 +203,21 @@ const styles = StyleSheet.create({
     color: colors.oliveGreen,
     textAlign: 'center',
     marginBottom: spacing.xxl,
+  },
+  configBanner: {
+    width: '100%',
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.cloudWhite,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.terracotta,
+  },
+  configBannerText: {
+    fontSize: typography.fontSize.caption,
+    color: colors.oliveGreen,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   buttonGroup: {
     width: '100%',

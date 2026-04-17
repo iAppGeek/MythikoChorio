@@ -12,8 +12,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PlayerStackParamList } from '../../../app/navigationTypes';
 import type { GameType } from '../../../data/islands/levelConfig';
+import type { IslandId } from '../../../data/islands/islandConfig';
 import { ISLANDS } from '../../../data/islands/islandConfig';
-import { getLevelsForIsland } from '../../../data/islands/levelConfig';
+import {
+  getLevelsForIsland,
+  isLevelUnlocked,
+  GAME_SCREEN,
+} from '../../../data/islands/levelConfig';
 import type { Level } from '../../../data/islands/levelConfig';
 import { getIslandProgress } from '../../../shared/services/progressService';
 import { useAuthStore } from '../../../shared/stores/authStore';
@@ -23,18 +28,6 @@ import { spacing } from '../../../app/theme/spacing';
 import { typography } from '../../../app/theme/typography';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'IslandLevelSelect'>;
-
-type GameScreenName = Extract<
-  keyof PlayerStackParamList,
-  'LetterLab' | 'MemoryMatch' | 'LetterRace' | 'SoundSafari'
->;
-
-const GAME_SCREEN: Record<GameType, GameScreenName> = {
-  letterLab: 'LetterLab',
-  soundSafari: 'SoundSafari',
-  memoryMatch: 'MemoryMatch',
-  letterRace: 'LetterRace',
-};
 
 const GAME_EMOJI: Record<GameType, string> = {
   letterLab: '✏️',
@@ -144,15 +137,15 @@ export function IslandLevelSelectScreen({
 }: Props): React.JSX.Element {
   const { islandId } = route.params;
   const island = ISLANDS.find(i => i.id === islandId);
-  const levels = getLevelsForIsland(
-    islandId as Parameters<typeof getLevelsForIsland>[0],
-  );
+  const levels = getLevelsForIsland(islandId as IslandId);
 
   const studentProfile = useAuthStore(s => s.studentProfile);
   const [progress, setProgress] = useState<Map<string, IslandProgress>>(
     new Map(),
   );
   const [loading, setLoading] = useState(true);
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -161,33 +154,36 @@ export function IslandLevelSelectScreen({
         return;
       }
 
+      let cancelled = false;
       setLoading(true);
       getIslandProgress(studentProfile.id, islandId)
         .then(rows => {
-          const map = new Map(rows.map(r => [r.level_id, r]));
-          setProgress(map);
+          if (cancelled) return;
+          setProgress(new Map(rows.map(r => [r.level_id, r])));
+          setProgressError(null);
         })
-        .catch(() => {
-          // Non-fatal: render with no progress (all levels at 0 stars)
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          console.warn('[IslandLevelSelect] getIslandProgress failed', err);
+          setProgressError(
+            err instanceof Error ? err.message : 'Unable to load progress',
+          );
         })
-        .finally(() => setLoading(false));
-    }, [studentProfile, islandId]),
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+
+      return (): void => {
+        cancelled = true;
+      };
+      // reloadTick is a manual bump used by the retry banner to force a re-fetch.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studentProfile, islandId, reloadTick]),
   );
 
-  /**
-   * A level is unlocked if it is the first incomplete level or any level
-   * before it. Boss Challenge follows the same rule — it unlocks after
-   * level 4 is complete.
-   */
-  function isUnlocked(index: number): boolean {
-    if (__DEV__) return true; // enables all levels in dev mode for testing
-    if (index === 0) return true;
-    for (let i = 0; i < index; i++) {
-      const p = progress.get(levels[i].id);
-      if (!p || p.stars_earned === 0) return false;
-    }
-    return true;
-  }
+  const starsByLevelId = new Map(
+    Array.from(progress.entries()).map(([id, p]) => [id, p.stars_earned]),
+  );
 
   function getStars(levelId: string): number {
     return progress.get(levelId)?.stars_earned ?? 0;
@@ -227,6 +223,21 @@ export function IslandLevelSelectScreen({
         <Text style={styles.headerTheme}>{island?.theme ?? ''}</Text>
       </View>
 
+      {progressError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText} numberOfLines={2}>
+            Couldn't load progress. {progressError}
+          </Text>
+          <Pressable
+            onPress={() => setReloadTick(t => t + 1)}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading progress"
+            style={styles.errorRetry}>
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* Level list */}
       <FlatList
         data={levels}
@@ -236,7 +247,7 @@ export function IslandLevelSelectScreen({
           <LevelCard
             level={item}
             index={index}
-            unlocked={isUnlocked(index)}
+            unlocked={isLevelUnlocked(index, levels, starsByLevelId)}
             stars={getStars(item.id)}
             onPress={() => handleLevelPress(item)}
           />
@@ -378,5 +389,38 @@ const styles = StyleSheet.create({
   },
   lockIcon: {
     fontSize: 20,
+  },
+
+  // ── Error banner
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.screen,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.errorBg,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: typography.fontSize.caption,
+    color: colors.error,
+  },
+  errorRetry: {
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 6,
+    backgroundColor: colors.cloudWhite,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  errorRetryText: {
+    fontSize: typography.fontSize.caption,
+    color: colors.error,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

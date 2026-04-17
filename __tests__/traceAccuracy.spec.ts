@@ -1,4 +1,4 @@
-import { calculateTraceAccuracy, scoreToStars } from '../src/features/letterLab/utils/traceAccuracy';
+import { calculateTraceAccuracy, scoreToStars } from '../src/shared/utils/traceAccuracy';
 
 describe('scoreToStars', () => {
   it('returns 3 stars for score >= 80', () => {

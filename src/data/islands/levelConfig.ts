@@ -107,3 +107,40 @@ export function isIslandCleared(
   if (levels.length === 0) return false;
   return levels.every((l) => (starsByLevelId.get(l.id) ?? 0) >= 1);
 }
+
+/**
+ * A level is unlocked if:
+ *   - it is the first level, OR
+ *   - every earlier level has at least one star
+ *
+ * In development builds (`__DEV__`) every level is unlocked so we can smoke-test
+ * any game without grinding through the unlock chain. This single helper is
+ * the only place that check lives — production code and tests share the same
+ * ordering logic.
+ */
+export function isLevelUnlocked(
+  levelIndex: number,
+  levels: readonly Level[],
+  starsByLevelId: Map<string, number>,
+): boolean {
+  if (__DEV__) return true;
+  if (levelIndex === 0) return true;
+  for (let i = 0; i < levelIndex; i++) {
+    if ((starsByLevelId.get(levels[i].id) ?? 0) === 0) return false;
+  }
+  return true;
+}
+
+/**
+ * Maps a `GameType` to the navigation screen that implements it. Centralised
+ * so the Results replay button and the level-select navigation share a single
+ * source of truth.
+ */
+export const GAME_SCREEN = {
+  letterLab: 'LetterLab',
+  soundSafari: 'SoundSafari',
+  memoryMatch: 'MemoryMatch',
+  letterRace: 'LetterRace',
+} as const satisfies Record<GameType, string>;
+
+export type GameScreenName = (typeof GAME_SCREEN)[GameType];

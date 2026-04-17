@@ -1,10 +1,12 @@
 // All paths are defined in a 280×280 coordinate space.
 // Each stroke is a polyline (array of points) drawn in pedagogical order.
 
+import type { Point, Stroke } from '../../shared/utils/skiaPathBuilder';
+import type { IslandId } from '../islands/islandConfig';
+
 export const CANVAS_SIZE = 280;
 
-export type Point = { x: number; y: number };
-export type Stroke = Point[];
+export type { Point, Stroke };
 
 export type GreekLetter = {
   id: string;
@@ -25,14 +27,42 @@ export const BETA_ISLAND_LETTER_IDS = new Set<string>([
   'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
 ]);
 
-export function getLettersForIsland(islandId: string): GreekLetter[] {
-  if (islandId === 'beta') {
-    return GREEK_LETTERS.filter((l) => BETA_ISLAND_LETTER_IDS.has(l.id));
+/**
+ * Returns the Greek letters that the given island drills.
+ *
+ * Uses an exhaustive switch so that adding a new `IslandId` produces a
+ * compile error here (via TypeScript's `never` check) — much safer than the
+ * previous "return all letters" fallback that silently hid missing data.
+ *
+ * Islands that don't centre on the alphabet (Chromata, Arithmoi, etc.)
+ * return `[]` and log a warning so misroutes surface in logs during dev.
+ */
+export function getLettersForIsland(islandId: IslandId): GreekLetter[] {
+  switch (islandId) {
+    case 'alpha':
+      return GREEK_LETTERS.filter((l) => ALPHA_ISLAND_LETTER_IDS.has(l.id));
+    case 'beta':
+      return GREEK_LETTERS.filter((l) => BETA_ISLAND_LETTER_IDS.has(l.id));
+    case 'chromata':
+    case 'arithmoi':
+    case 'oikogeneia':
+    case 'zoa':
+    case 'fagito':
+    case 'soma':
+    case 'kairos':
+    case 'spiti':
+      console.warn(
+        `[getLettersForIsland] island "${islandId}" has no letter set yet`,
+      );
+      return [];
+    default: {
+      const exhaustive: never = islandId;
+      console.warn(
+        `[getLettersForIsland] unhandled island id: ${exhaustive as string}`,
+      );
+      return [];
+    }
   }
-  if (islandId === 'alpha') {
-    return GREEK_LETTERS.filter((l) => ALPHA_ISLAND_LETTER_IDS.has(l.id));
-  }
-  return GREEK_LETTERS;
 }
 
 export const GREEK_LETTERS: GreekLetter[] = [

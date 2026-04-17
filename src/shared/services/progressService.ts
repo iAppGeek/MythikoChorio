@@ -1,10 +1,11 @@
-import { supabase } from './supabaseClient';
+import { requireSupabase } from './supabaseClient';
 import type { IslandProgress } from '../models/Progress';
 
 export async function getIslandProgress(
   studentProfileId: string,
   islandId: string,
 ): Promise<IslandProgress[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('island_progress')
     .select('*')
@@ -21,6 +22,7 @@ export async function getIslandProgress(
 export async function getAllProgress(
   studentProfileId: string,
 ): Promise<IslandProgress[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('island_progress')
     .select('*')
@@ -33,6 +35,11 @@ export async function getAllProgress(
   return data ?? [];
 }
 
+/**
+ * Delegates to the `upsert_level_progress` RPC so that `times_played` is
+ * incremented atomically on every play and `best_score` / `stars_earned`
+ * keep the best-ever value rather than whatever the caller just produced.
+ */
 export async function upsertLevelProgress(params: {
   studentProfileId: string;
   islandId: string;
@@ -43,20 +50,14 @@ export async function upsertLevelProgress(params: {
   const { studentProfileId, islandId, levelId, starsEarned, bestScore } =
     params;
 
-  const { error } = await supabase.from('island_progress').upsert(
-    {
-      student_profile_id: studentProfileId,
-      island_id: islandId,
-      level_id: levelId,
-      stars_earned: starsEarned,
-      best_score: bestScore,
-      completed_at: starsEarned > 0 ? new Date().toISOString() : null,
-    },
-    {
-      onConflict: 'student_profile_id,island_id,level_id',
-      ignoreDuplicates: false,
-    },
-  );
+  const supabase = requireSupabase();
+  const { error } = await supabase.rpc('upsert_level_progress', {
+    p_student_profile_id: studentProfileId,
+    p_island_id: islandId,
+    p_level_id: levelId,
+    p_stars_earned: starsEarned,
+    p_best_score: bestScore,
+  });
 
   if (error) {
     throw new Error(`Failed to save level progress: ${error.message}`);

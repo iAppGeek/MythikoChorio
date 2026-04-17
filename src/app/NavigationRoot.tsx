@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import SplashScreen from 'react-native-splash-screen';
 import { useAuthStore } from '../shared/stores/authStore';
 import { WelcomeScreen } from '../features/auth/screens/WelcomeScreen';
 import { IslandMapScreen } from '../features/map/screens/IslandMapScreen';
@@ -86,6 +87,14 @@ export function NavigationRoot(): React.JSX.Element {
   useEffect(() => {
     loadSession();
   }, [loadSession]);
+
+  // Hide the native splash only once auth bootstrap has resolved, so the user
+  // never sees the JS loading indicator flash before the first real screen.
+  useEffect(() => {
+    if (status !== 'loading') {
+      SplashScreen.hide();
+    }
+  }, [status]);
 
   if (status === 'loading') {
     return (

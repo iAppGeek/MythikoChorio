@@ -1,6 +1,14 @@
 jest.mock('react-native-splash-screen', () => ({
-  hide: jest.fn(),
-  show: jest.fn(),
+  __esModule: true,
+  default: { hide: jest.fn(), show: jest.fn() },
+}));
+
+jest.mock('react-native-config', () => ({
+  __esModule: true,
+  default: {
+    SUPABASE_URL: 'https://mock.supabase.co',
+    SUPABASE_ANON_KEY: 'mock-anon-key',
+  },
 }));
 
 jest.mock('react-native-reanimated', () => {

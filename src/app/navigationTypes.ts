@@ -1,6 +1,8 @@
 // Navigation param lists live here — imported by both screens and NavigationRoot
 // to avoid circular dependencies.
 
+import type { GameType } from '../data/islands/levelConfig';
+
 export type AuthStackParamList = {
   Welcome: undefined;
 };
@@ -19,6 +21,8 @@ export type PlayerStackParamList = {
     levelName: string;
     islandId: string;
     levelId: string;
+    /** Game that the user just completed — used to route the Replay button. */
+    gameType: GameType;
   };
 };
 

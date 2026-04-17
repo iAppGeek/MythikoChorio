@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import type { Point, Stroke } from '../../../data/alphabet/letterData';
+import type { Point, Stroke } from '../utils/skiaPathBuilder';
 
 type TracingCanvasResult = {
   strokes: Stroke[];
