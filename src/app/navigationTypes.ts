@@ -15,6 +15,10 @@ export type PlayerStackParamList = {
   SoundSafari: { islandId: string; levelId: string };
   MemoryMatch: { islandId: string; levelId: string };
   LetterRace: { islandId: string; levelId: string };
+  WordBubbles: { islandId: string; levelId: string };
+  PictureHunt: { islandId: string; levelId: string };
+  Jukebox: undefined;
+  Backpack: undefined;
   // ── Shared
   Results: {
     stars: 1 | 2 | 3;

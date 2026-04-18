@@ -1,6 +1,12 @@
 import type { IslandId } from './islandConfig';
 
-export type GameType = 'letterLab' | 'soundSafari' | 'memoryMatch' | 'letterRace';
+export type GameType =
+  | 'letterLab'
+  | 'soundSafari'
+  | 'memoryMatch'
+  | 'letterRace'
+  | 'wordBubbles'
+  | 'pictureHunt';
 
 export type Level = {
   id: string;
@@ -40,6 +46,20 @@ const ALPHA_LEVELS: Level[] = [
     isBossChallenge: false,
   },
   {
+    id: 'alpha_word_bubbles',
+    name: 'Word Bubbles',
+    description: 'Pop letters to spell words',
+    gameType: 'wordBubbles',
+    isBossChallenge: false,
+  },
+  {
+    id: 'alpha_picture_hunt',
+    name: 'Picture Hunt',
+    description: 'Find objects in the scene',
+    gameType: 'pictureHunt',
+    isBossChallenge: false,
+  },
+  {
     id: 'alpha_letter_race',
     name: 'Boss Challenge',
     description: 'Write letters from memory',
@@ -75,6 +95,20 @@ const BETA_LEVELS: Level[] = [
     name: 'Letter Match',
     description: 'Uppercase to lowercase pairs',
     gameType: 'memoryMatch',
+    isBossChallenge: false,
+  },
+  {
+    id: 'beta_word_bubbles',
+    name: 'Word Bubbles',
+    description: 'Pop letters to spell words',
+    gameType: 'wordBubbles',
+    isBossChallenge: false,
+  },
+  {
+    id: 'beta_picture_hunt',
+    name: 'Picture Hunt',
+    description: 'Find objects in the scene',
+    gameType: 'pictureHunt',
     isBossChallenge: false,
   },
   {
@@ -141,6 +175,8 @@ export const GAME_SCREEN = {
   soundSafari: 'SoundSafari',
   memoryMatch: 'MemoryMatch',
   letterRace: 'LetterRace',
+  wordBubbles: 'WordBubbles',
+  pictureHunt: 'PictureHunt',
 } as const satisfies Record<GameType, string>;
 
 export type GameScreenName = (typeof GAME_SCREEN)[GameType];

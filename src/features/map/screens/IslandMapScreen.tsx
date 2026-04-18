@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -109,6 +110,19 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
   );
   const [progressError, setProgressError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
+  const lastMilestoneRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const d = studentProfile?.streak_days;
+    if (d == null) return;
+    if (d === 7 || d === 30) {
+      if (lastMilestoneRef.current !== d) {
+        setStreakMilestone(d);
+        lastMilestoneRef.current = d;
+      }
+    }
+  }, [studentProfile?.streak_days]);
 
   useFocusEffect(
     useCallback(() => {
@@ -157,7 +171,35 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={streakMilestone != null}
+        onRequestClose={() => setStreakMilestone(null)}>
+        <View style={styles.milestoneBackdrop}>
+          <View style={styles.milestoneCard}>
+            <Text style={styles.milestoneTitle}>
+              {streakMilestone === 7
+                ? 'One week of learning'
+                : 'A full month of learning'}
+            </Text>
+            <Text style={styles.milestoneBody}>
+              {streakMilestone} days in a row. The octopus is proud of you.
+            </Text>
+            <Text style={styles.milestoneNote}>
+              (Lottie animation can be added when assets are ready.)
+            </Text>
+            <Pressable
+              style={styles.milestoneBtn}
+              onPress={() => setStreakMilestone(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Close">
+              <Text style={styles.milestoneBtnText}>Yay!</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.playerInfo}>
@@ -175,7 +217,7 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
             <Text style={styles.statValue}>{studentProfile?.total_stars ?? 0}</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statEmoji}>🔥</Text>
+            <Text style={styles.statEmoji}>🐙</Text>
             <Text style={styles.statValue}>{studentProfile?.streak_days ?? 0}</Text>
           </View>
         </View>
@@ -215,8 +257,24 @@ export function IslandMapScreen({ navigation }: Props): React.JSX.Element {
         ))}
       </ScrollView>
 
-      {/* Bottom navigation (Jukebox / Backpack / Settings) lands in Phase 4+.
-          Removed the placeholder Pressables that pretended to be interactive. */}
+      <View style={styles.bottomNav}>
+        <Pressable
+          style={styles.bottomNavBtn}
+          onPress={() => navigation.navigate('Jukebox')}
+          accessibilityRole="button"
+          accessibilityLabel="Open jukebox">
+          <Text style={styles.bottomNavEmoji}>🎵</Text>
+          <Text style={styles.bottomNavLabel}>Jukebox</Text>
+        </Pressable>
+        <Pressable
+          style={styles.bottomNavBtn}
+          onPress={() => navigation.navigate('Backpack')}
+          accessibilityRole="button"
+          accessibilityLabel="Open backpack">
+          <Text style={styles.bottomNavEmoji}>🎒</Text>
+          <Text style={styles.bottomNavLabel}>Backpack</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -340,6 +398,74 @@ const styles = StyleSheet.create({
   },
   islandLabelLocked: {
     color: colors.lockedLabel,
+  },
+
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xl,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.screen,
+    backgroundColor: colors.softSand,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  bottomNavBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  bottomNavEmoji: {
+    fontSize: 28,
+  },
+  bottomNavLabel: {
+    fontSize: typography.fontSize.caption,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.oceanBlue,
+    marginTop: 2,
+  },
+
+  milestoneBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    padding: spacing.screen,
+  },
+  milestoneCard: {
+    backgroundColor: colors.cloudWhite,
+    borderRadius: 20,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  milestoneTitle: {
+    fontSize: typography.fontSize.heading,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.oceanBlue,
+    textAlign: 'center',
+  },
+  milestoneBody: {
+    fontSize: typography.fontSize.body,
+    color: colors.oliveGreen,
+    textAlign: 'center',
+  },
+  milestoneNote: {
+    fontSize: typography.fontSize.caption,
+    color: colors.oliveGreen,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  milestoneBtn: {
+    marginTop: spacing.sm,
+    alignSelf: 'center',
+    backgroundColor: colors.oceanBlue,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+  },
+  milestoneBtnText: {
+    color: colors.cloudWhite,
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.body,
   },
 
   // ── Error banner

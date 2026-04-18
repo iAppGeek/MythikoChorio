@@ -9,6 +9,7 @@ import {
   getStudentProfile,
   signOut as authSignOut,
 } from '../services/authService';
+import { reconcileStreakOnLaunch } from '../services/streakService';
 import type { StudentProfile } from '../models/Student';
 
 /**
@@ -31,6 +32,8 @@ type AuthStore = {
   studentProfile: StudentProfile | null;
   /** Called once on app mount — restores session from AsyncStorage if present. */
   loadSession: () => Promise<void>;
+  /** Re-fetch student_profiles row after server-side updates (streak, stars). */
+  refreshStudentProfile: () => Promise<void>;
   /** Guest sign-in: anonymous auth + profile creation. */
   signInAsGuest: (displayName: string, age: number) => Promise<void>;
   signOut: () => Promise<void>;
@@ -60,15 +63,31 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const profile = await getStudentProfile(session.user.id);
 
     if (profile) {
+      await reconcileStreakOnLaunch(profile.id);
+      const refreshed = await getStudentProfile(session.user.id);
+
       set({
         status: 'guest',
         authUserId: session.user.id,
-        studentProfile: profile,
+        studentProfile: refreshed ?? profile,
       });
     } else {
       // Session exists but no matching profile — clear stale session.
       await supabase.auth.signOut();
       set({ status: 'unauthenticated', authUserId: null, studentProfile: null });
+    }
+  },
+
+  refreshStudentProfile: async (): Promise<void> => {
+    if (!supabase) return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const profile = await getStudentProfile(session.user.id);
+    if (profile) {
+      set({ studentProfile: profile });
     }
   },
 

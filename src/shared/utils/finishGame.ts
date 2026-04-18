@@ -1,7 +1,11 @@
 import { clearGameProgress } from '../services/gameProgressCache';
 import { upsertLevelProgress } from '../services/progressService';
 import { saveGameScore } from '../services/scoreService';
+import type { IslandId } from '../../data/islands/islandConfig';
+import { maybeAwardIslandSouvenir } from '../services/souvenirService';
+import { recordGameActivity } from '../services/streakService';
 import type { CacheMap } from '../services/gameProgressCache';
+import type { Json } from '../../types/database';
 
 /** Clamp to DB-safe 0–100 integer for `game_scores.score`. */
 export function clampScore0To100(n: number): number {
@@ -22,6 +26,8 @@ export type GameScoreDetails = {
   attempts?: number | null;
   /** Optional hints used. */
   hintsUsed?: number | null;
+  /** Optional structured payload stored in `game_scores.details` (JSONB). */
+  details?: Json | null;
 };
 
 type FinishGameParams = {
@@ -75,6 +81,7 @@ export async function finishGame({
   await clearGameProgress(game, levelId, profileId);
 
   let hadPersistFailure = false;
+  let upsertSucceeded = false;
 
   if (studentProfileId) {
     try {
@@ -85,6 +92,7 @@ export async function finishGame({
         starsEarned: stars,
         bestScore,
       });
+      upsertSucceeded = true;
     } catch (err) {
       hadPersistFailure = true;
       console.warn('[finishGame] upsertLevelProgress failed', err);
@@ -103,12 +111,29 @@ export async function finishGame({
           time_spent_secs: scoreDetails.timeSpentSecs ?? null,
           attempts: scoreDetails.attempts ?? null,
           hints_used: scoreDetails.hintsUsed ?? null,
+          details: scoreDetails.details ?? null,
           completed_at: new Date().toISOString(),
         });
       } catch (err) {
         hadPersistFailure = true;
         console.warn('[finishGame] saveGameScore failed', err);
         onPersistError?.(err);
+      }
+    }
+
+    if (upsertSucceeded) {
+      try {
+        await maybeAwardIslandSouvenir(
+          studentProfileId,
+          islandId as IslandId,
+        );
+      } catch (err) {
+        console.warn('[finishGame] souvenir check failed', err);
+      }
+      try {
+        await recordGameActivity(studentProfileId);
+      } catch (err) {
+        console.warn('[finishGame] streak update failed', err);
       }
     }
   }

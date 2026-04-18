@@ -124,6 +124,9 @@ export const ISLANDS: Island[] = [
 export function getUnlockedIslands(
   clearedIslands: Set<IslandId>,
 ): Set<IslandId> {
+  if (__DEV__) {
+    return new Set(ISLANDS.map((i) => i.id));
+  }
   const unlocked = new Set<IslandId>();
   for (const island of ISLANDS) {
     if (island.unlockAfter === null || clearedIslands.has(island.unlockAfter)) {

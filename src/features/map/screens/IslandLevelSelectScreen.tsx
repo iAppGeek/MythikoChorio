@@ -34,6 +34,8 @@ const GAME_EMOJI: Record<GameType, string> = {
   soundSafari: '🔊',
   memoryMatch: '🃏',
   letterRace: '🏁',
+  wordBubbles: '🫧',
+  pictureHunt: '🔎',
 };
 
 // ─── Separator ────────────────────────────────────────────────────────────────

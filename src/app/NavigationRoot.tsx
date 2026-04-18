@@ -11,6 +11,10 @@ import { LetterLabScreen } from '../features/letterLab/LetterLabScreen';
 import { SoundSafariScreen } from '../features/soundSafari/SoundSafariScreen';
 import { MemoryMatchScreen } from '../features/memoryMatch/MemoryMatchScreen';
 import { LetterRaceScreen } from '../features/letterRace/LetterRaceScreen';
+import { WordBubblesScreen } from '../features/wordBubbles/WordBubblesScreen';
+import { PictureHuntScreen } from '../features/pictureHunt/PictureHuntScreen';
+import { JukeboxScreen } from '../features/jukebox/screens/JukeboxScreen';
+import { BackpackScreen } from '../features/rewards/screens/BackpackScreen';
 import { ResultsScreen } from '../features/games/shared/ResultsScreen';
 import { colors } from './theme/colors';
 import type { AuthStackParamList, PlayerStackParamList } from './navigationTypes';
@@ -67,6 +71,26 @@ function PlayerNavigator(): React.JSX.Element {
       <PlayerStack.Screen
         name="LetterRace"
         component={LetterRaceScreen}
+        options={{ headerShown: false }}
+      />
+      <PlayerStack.Screen
+        name="WordBubbles"
+        component={WordBubblesScreen}
+        options={{ headerShown: false }}
+      />
+      <PlayerStack.Screen
+        name="PictureHunt"
+        component={PictureHuntScreen}
+        options={{ headerShown: false }}
+      />
+      <PlayerStack.Screen
+        name="Jukebox"
+        component={JukeboxScreen}
+        options={{ headerShown: false }}
+      />
+      <PlayerStack.Screen
+        name="Backpack"
+        component={BackpackScreen}
         options={{ headerShown: false }}
       />
       <PlayerStack.Screen
