@@ -1,3 +1,25 @@
+/* eslint-env jest */
+
+jest.mock('react-native-sound', () => {
+  class MockSound {
+    constructor(filename, bundle, cb) {
+      if (cb) {
+        setTimeout(() => cb(null), 0);
+      }
+    }
+    play(cb) {
+      if (cb) cb();
+    }
+    pause() {}
+    stop() {}
+    release() {}
+    setNumberOfLoops() {}
+  }
+  MockSound.setCategory = jest.fn();
+  MockSound.MAIN_BUNDLE = '';
+  return { __esModule: true, default: MockSound };
+});
+
 jest.mock('react-native-splash-screen', () => ({
   __esModule: true,
   default: { hide: jest.fn(), show: jest.fn() },

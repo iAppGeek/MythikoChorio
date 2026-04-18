@@ -16,8 +16,11 @@ import {
 } from '../games/shared/useGameSession';
 import { GameShell } from '../games/shared/GameShell';
 import { colors } from '../../app/theme/colors';
+import { spacing } from '../../app/theme/spacing';
 import { typography } from '../../app/theme/typography';
 import { gameStyles } from '../../app/theme/gameStyles';
+import { isTablet } from '../../app/theme/responsive';
+import { LetterReferencePanel } from './LetterReferencePanel';
 
 type Props = NativeStackScreenProps<PlayerStackParamList, 'LetterLab'>;
 
@@ -173,28 +176,55 @@ export function LetterLabScreen({ route, navigation }: Props): React.JSX.Element
           </View>
         </>
       }>
-      {letter && (
-        <View style={styles.stepContainer} key={`${letterIndex}-${stepIndex}`}>
-          {currentStep === 'meet' && (
-            <MeetTheLetterStep letter={letter} onComplete={() => advanceStep()} />
-          )}
-          {currentStep === 'watch' && (
-            <WatchItWriteStep letter={letter} onComplete={() => advanceStep()} />
-          )}
-          {currentStep === 'trace' && (
-            <GuidedTraceStep letter={letter} onComplete={(acc) => advanceStep(acc)} />
-          )}
-          {currentStep === 'free' && (
-            <FreeWriteStep letter={letter} onComplete={() => advanceStep()} />
-          )}
-          {currentStep === 'challenge' && (
-            <LetterChallengeStep
-              letter={letter}
-              onComplete={(correct) => advanceStep(correct ? 100 : 0)}
-            />
-          )}
-        </View>
-      )}
+      {letter &&
+        (isTablet ? (
+          <View style={styles.tabletRow} key={`${letterIndex}-${stepIndex}`}>
+            <View style={styles.tabletMain}>
+              {currentStep === 'meet' && (
+                <MeetTheLetterStep letter={letter} onComplete={() => advanceStep()} />
+              )}
+              {currentStep === 'watch' && (
+                <WatchItWriteStep letter={letter} onComplete={() => advanceStep()} />
+              )}
+              {currentStep === 'trace' && (
+                <GuidedTraceStep letter={letter} onComplete={(acc) => advanceStep(acc)} />
+              )}
+              {currentStep === 'free' && (
+                <FreeWriteStep letter={letter} onComplete={() => advanceStep()} />
+              )}
+              {currentStep === 'challenge' && (
+                <LetterChallengeStep
+                  letter={letter}
+                  onComplete={(correct) => advanceStep(correct ? 100 : 0)}
+                />
+              )}
+            </View>
+            <View style={styles.tabletSidebar}>
+              <LetterReferencePanel letter={letter} />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.stepContainer} key={`${letterIndex}-${stepIndex}`}>
+            {currentStep === 'meet' && (
+              <MeetTheLetterStep letter={letter} onComplete={() => advanceStep()} />
+            )}
+            {currentStep === 'watch' && (
+              <WatchItWriteStep letter={letter} onComplete={() => advanceStep()} />
+            )}
+            {currentStep === 'trace' && (
+              <GuidedTraceStep letter={letter} onComplete={(acc) => advanceStep(acc)} />
+            )}
+            {currentStep === 'free' && (
+              <FreeWriteStep letter={letter} onComplete={() => advanceStep()} />
+            )}
+            {currentStep === 'challenge' && (
+              <LetterChallengeStep
+                letter={letter}
+                onComplete={(correct) => advanceStep(correct ? 100 : 0)}
+              />
+            )}
+          </View>
+        ))}
     </GameShell>
   );
 }
@@ -223,5 +253,19 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     flex: 1,
+  },
+  tabletRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  tabletMain: {
+    flex: 1.5,
+    minWidth: 0,
+  },
+  tabletSidebar: {
+    flex: 1,
+    minWidth: 280,
+    maxWidth: 420,
   },
 });

@@ -35,8 +35,13 @@ describe('gameProgressCache', () => {
         letterScores: [],
       });
       await saveGameProgress('soundSafari', 'level-1', 'profile-A', {
+        letterIdsRound: ['alpha'],
         roundIndex: 2,
-        correct: 1,
+        correctFirstTry: 1,
+        confusedPairs: [],
+        responseMsTotal: 0,
+        roundsCompleted: 2,
+        retryCountRound: 0,
       });
       await saveGameProgress('letterLab', 'level-1', 'profile-B', {
         letterIndex: 0,
@@ -85,7 +90,15 @@ describe('gameProgressCache', () => {
 
   describe('loadGameProgress', () => {
     it('returns parsed value when present', async () => {
-      const payload = { roundIndex: 3, correct: 2 };
+      const payload = {
+        letterIdsRound: ['alpha', 'beta'],
+        roundIndex: 3,
+        correctFirstTry: 2,
+        confusedPairs: [],
+        responseMsTotal: 4000,
+        roundsCompleted: 3,
+        retryCountRound: 0,
+      };
       getItem.mockResolvedValueOnce(JSON.stringify(payload));
 
       const result = await loadGameProgress('soundSafari', 'lvl', 'p');

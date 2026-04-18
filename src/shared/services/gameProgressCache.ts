@@ -12,9 +12,20 @@ export type LetterLabCache = {
   letterScores: number[];
 };
 
+export type SoundSafariConfusedPair = {
+  played: string;
+  wrongChoice: string;
+};
+
 export type SoundSafariCache = {
+  letterIdsRound: string[];
   roundIndex: number;
-  correct: number;
+  correctFirstTry: number;
+  confusedPairs: SoundSafariConfusedPair[];
+  responseMsTotal: number;
+  roundsCompleted: number;
+  /** Wrong taps on the current round before correct (not persisted across app restarts precisely). */
+  retryCountRound: number;
 };
 
 export type MemoryMatchCache = {
@@ -31,11 +42,39 @@ export type LetterRaceCache = {
   scores: number[];
 };
 
+export type WordBubblesStats = {
+  wordsCompleted: number;
+  wordsWithoutError: number;
+  correctPops: number;
+  wrongPops: number;
+};
+
+export type WordBubblesCache = {
+  /** Ordered word IDs for the session so the queue survives a reload. */
+  wordIds: string[];
+  wordIndex: number;
+  /** Position within the current word (0 = first letter). */
+  letterIndex: number;
+  stats: WordBubblesStats;
+};
+
+export type PictureHuntCache = {
+  sceneId: string;
+  itemIndex: number;
+  /** Item ids already found for the current scene. */
+  foundItemIds: string[];
+  wrongTaps: number;
+  firstTryCorrect: number;
+  responseMsTotal: number;
+};
+
 export type CacheMap = {
   letterLab: LetterLabCache;
   soundSafari: SoundSafariCache;
   memoryMatch: MemoryMatchCache;
   letterRace: LetterRaceCache;
+  wordBubbles: WordBubblesCache;
+  pictureHunt: PictureHuntCache;
 };
 
 function key<G extends keyof CacheMap>(

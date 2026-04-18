@@ -7,6 +7,12 @@ jest.mock('../src/shared/services/progressService', () => ({
 jest.mock('../src/shared/services/scoreService', () => ({
   saveGameScore: jest.fn(),
 }));
+jest.mock('../src/shared/services/souvenirService', () => ({
+  maybeAwardIslandSouvenir: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/shared/services/streakService', () => ({
+  recordGameActivity: jest.fn().mockResolvedValue(undefined),
+}));
 
 import { finishGame, clampScore0To100 } from '../src/shared/utils/finishGame';
 import { clearGameProgress } from '../src/shared/services/gameProgressCache';
@@ -23,7 +29,7 @@ function baseParams(overrides: Partial<Parameters<typeof finishGame>[0]> = {}) {
     levelId: 'level-1',
     profileId: 'profile-1',
     studentProfileId: 'student-1',
-    islandId: 'alphabet-island',
+    islandId: 'alpha',
     stars: 3 as 1 | 2 | 3,
     bestScore: 90,
     setSaving: jest.fn(),
@@ -48,7 +54,7 @@ describe('finishGame', () => {
     expect(clearMock).toHaveBeenCalledWith('letterLab', 'level-1', 'profile-1');
     expect(upsertMock).toHaveBeenCalledWith({
       studentProfileId: 'student-1',
-      islandId: 'alphabet-island',
+      islandId: 'alpha',
       levelId: 'level-1',
       starsEarned: 3,
       bestScore: 90,
@@ -85,7 +91,7 @@ describe('finishGame', () => {
     expect(arg).toEqual(
       expect.objectContaining({
         student_profile_id: 'student-1',
-        island_id: 'alphabet-island',
+        island_id: 'alpha',
         level_id: 'level-1',
         game_type: 'letterLab',
         score: 82,
@@ -93,6 +99,7 @@ describe('finishGame', () => {
         time_spent_secs: 45,
         attempts: 6,
         hints_used: 1,
+        details: null,
       }),
     );
     expect(typeof arg.completed_at).toBe('string');

@@ -11,14 +11,14 @@
 ## Tasks
 
 - [x] Implement Beta Island (letters Ν–Ω)
-- [ ] Build Word Bubbles game type
-- [ ] Build Sound Safari game type
-- [ ] Build Picture Hunt game type
-- [ ] Record and integrate the Alphabet Song
-- [ ] Build the Jukebox screen with song playback
-- [ ] Implement the Backpack (souvenir collection) screen
-- [ ] Add daily streak tracking
-- [ ] Tablet layout for Letter Lab (split-screen canvas + reference)
+- [x] Build Word Bubbles game type
+- [x] Build Sound Safari game type (audio-first rework)
+- [x] Build Picture Hunt game type
+- [x] Integrate the Alphabet Song (audio asset pending — service + config wired)
+- [x] Build the Jukebox screen with song playback
+- [x] Implement the Backpack (souvenir collection) screen
+- [x] Add daily streak tracking
+- [x] Tablet layout for Letter Lab (split-screen canvas + reference)
 
 ---
 
@@ -34,25 +34,25 @@
 
 Verified: `npx tsc --noEmit` clean; `npm test` → 3 suites, 14 tests passing.
 
-### What's still open (pick up here)
-- **Word Bubbles** (task 2): folder `src/features/games/wordBubbles/` exists but is empty. Needs game screen, Reanimated bubble physics, picture-hint word targets, and silent scoring `{ wordsCompleted, wordsWithoutError, avgLetterRecognitionMs }`.
-- **Sound Safari rework** (task 3): `src/features/soundSafari/SoundSafariScreen.tsx` already exists from Phase 1 but uses the Phase-1 format (letter shown → pick sound description). Phase 2 spec wants audio-first (play sound → tap picture/letter option) with streak counter and new `details` JSONB: `{ correctFirstTry, avgResponseTimeMs, confusedPairs }`. Decide: rebuild vs extend.
-- **Picture Hunt** (task 4): `src/features/games/pictureHunt/` empty. Needs scene illustrations (placeholders for now), tap-to-find objects, `{ correctFirstTap, avgTimePerItem, categoryBreakdown }` scoring.
-- **Audio service + Jukebox** (task 5): no `audioService.ts` yet, `src/features/jukebox/` and `src/data/songs/` are empty. Need `react-native-sound` wrapper, `songConfig.ts`, and a JukeboxScreen. Assets (alphabet song, letter pronunciation audio, SFX) are not yet provided.
-- **Backpack** (task 6): `src/features/rewards/` empty. Needs `BackpackScreen` reading from the `souvenirs` table, grid of collected/mystery slots, detail card on tap. Alpha → "Golden Alpha", Beta → "Omega Crown" (awarded on island clear).
-- **Daily streak** (task 7): `student_profiles.streak_days` and `last_active` already exist. Need: on app open, reconcile streak (yesterday → +1, today → noop, >1 day → reset to 1); Zustand slice; header chip on Island Map (the header already renders `streak_days`, but nothing currently updates it); milestone Lottie at 7 / 30 days.
-- **Tablet layout for Letter Lab** (task 8): gate on `isTablet` from `src/app/theme/responsive.ts`; on tablets split canvas (60%) and reference panel (40%) with target letter, stroke order, name, play-sound button.
+### 2026-04-18 — Phase 2 features landed
+- **Word Bubbles** (`src/features/wordBubbles/WordBubblesScreen.tsx` + `src/data/vocabulary/wordBubblesWords.ts`): rising Reanimated bubbles with sinusoidal wobble, answer bar, island-scoped letter pool, speed ramp 9s → 5.5s. Six-word Alpha and Beta lists using only letters learned by that island. Pop accuracy → stars. Level inserted on both islands before the boss challenge.
+- **Sound Safari audio-first rework** (`src/features/soundSafari/SoundSafariScreen.tsx`): plays letter audio via `audioService.playLetterSound` on round enter and retry, 4-letter option grid, wrong answers replay audio and let the child retry, streak counter animates on consecutive firsts. New score detail shape `{ correctFirstTry, avgResponseTimeMs, confusedPairs }` persisted via `GameScoreDetails.details`.
+- **Picture Hunt** (`src/features/pictureHunt/PictureHuntScreen.tsx` + `src/data/games/pictureHuntScenes.ts`): 8-object emoji scenes (kitchen for Alpha, beach for Beta), tap-to-find mechanic, prompt banner, ripple on miss, check-mark bounce on hit. Details: `{ correctFirstTap, avgTimePerItem, categoryBreakdown }`.
+- **Audio service** (`src/shared/services/audioService.ts`): `react-native-sound` wrapper with `playSong`, `pauseSong`, `resumeSong`, `stopSong`, `playSoundEffect`, `playLetterSound`. File maps are empty until real assets ship; all calls no-op gracefully when the filename lookup misses.
+- **Jukebox** (`src/features/jukebox/screens/JukeboxScreen.tsx` + `src/data/songs/songConfig.ts`): record-player card list, lock state driven by `ISLANDS` clear state, play/pause/replay, Sing Along placeholder. Alphabet Song unlocks after Alpha Island.
+- **Backpack** (`src/features/rewards/screens/BackpackScreen.tsx` + `src/shared/services/souvenirService.ts`): grid of island souvenir slots with mystery silhouettes, counter, detail card on tap. `maybeAwardIslandSouvenir` is called from `finishGame`; awards are idempotent via the unique constraint on `(student_profile_id, island_id, souvenir_type)`.
+- **Daily streak** (`src/shared/services/streakService.ts` + `src/shared/services/studentProfileService.ts`): `recordGameActivity` called from `finishGame` bumps `streak_days` / `last_active` with local-calendar-day continuity (same day → keep, +1 day → +1, ≥2 days → reset). `reconcileStreakOnLaunch` resets stale streaks in `authStore.loadSession`. Map header renders `streak_days`; milestone overlay fires on 7 / 30 day boundaries. `authStore.refreshStudentProfile` re-hydrates after server-side updates.
+- **Tablet Letter Lab** (`src/features/letterLab/LetterReferencePanel.tsx` + edits in `LetterLabScreen.tsx`): on `isTablet`, canvas takes 60% width and a right-side reference panel shows the target letter at full size, stroke-order diagram, name, and a play-sound button. Phone layout unchanged.
+- **Nav + wiring**: `PlayerStackParamList` gained `WordBubbles`, `PictureHunt`, `Jukebox`, `Backpack`. `IslandMapScreen` bottom nav now navigates to Jukebox / Backpack. `GAME_SCREEN`, `GAME_EMOJI`, and the `GameType` union extended for the two new games.
+- **Tests**: `__tests__/gameProgressCache.spec.ts` extended for `wordBubbles`; `__tests__/finishGame.spec.ts` covers the new souvenir + streak side-effects. `jest.setup.js` now mocks `react-native-sound`.
 
-### Navigation + wiring still needed
-- `PlayerStackParamList` in `src/app/navigationTypes.ts` has no routes for `WordBubbles`, `PictureHunt`, `Jukebox`, or `Backpack` yet.
-- `IslandMapScreen` bottom nav Jukebox/Backpack buttons are not wired to `navigation.navigate(...)`.
-- `GAME_SCREEN` / `GAME_EMOJI` maps in `IslandLevelSelectScreen` and the `GameType` union in `levelConfig.ts` will need `wordBubbles` / `pictureHunt` entries when those games are introduced to any island's levels.
+Verified: `npx tsc --noEmit` clean; `npm test` → 6 suites, 40 tests passing.
 
-### Asset gaps (blocking full polish)
-- No audio assets yet (alphabet song, per-letter pronunciation, game SFX).
-- No Lottie files for streak milestones.
-- No scene illustrations for Picture Hunt.
-- No souvenir illustrations.
+### Asset gaps (shipping blockers for polish, not for logic)
+- No audio assets wired up yet — alphabet song, per-letter pronunciations, and SFX placeholders. `audioService` file maps are intentionally empty until an asset drop lands.
+- No Lottie files for streak milestones (7 / 30 days). The overlay uses text + emoji placeholders.
+- Picture Hunt scenes use emoji standees instead of illustrations.
+- Souvenirs render as emoji + gradient tiles — swap in real illustrations when art lands.
 
 ---
 

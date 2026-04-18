@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -44,6 +45,11 @@ function AnimatedStar({
 export function ResultsScreen({ route, navigation }: Props): React.JSX.Element {
   const { stars, levelName, islandId, levelId, gameType } = route.params;
   const praise = PRAISE[stars - 1];
+  const refreshStudentProfile = useAuthStore((s) => s.refreshStudentProfile);
+
+  useEffect(() => {
+    refreshStudentProfile().catch(() => {});
+  }, [refreshStudentProfile]);
 
   function handleReplay(): void {
     // Replace the current Results entry with a fresh game screen so the back
